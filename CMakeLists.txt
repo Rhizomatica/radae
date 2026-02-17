@@ -657,7 +657,7 @@ add_test(NAME v2_rx2_mpp_high
          set_tests_properties(v2_rx2_mpp_high PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 add_test(NAME v2_rx2_mpp_low
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
-                       delta=0.03 ./test/v2_spot.sh --g_file g_mpp.f32 --EbNodB 6")
+                       delta=0.03 ./test/v2_spot.sh --g_file g_mpp.f32 --EbNodB 6 --hangover 100")
          set_tests_properties(v2_rx2_mpp_low PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
         
 # repeat v2_rx2_mpp_low with 20ms (half frame) time shift to repeat last test with opposite frame sync

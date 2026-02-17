@@ -123,7 +123,9 @@ Fs = float(model.Fs)
 alpha = 0.95
 alpha_agc = 0.995
 beta = 0.999
-Ts = 0.42
+Tsig = 0.42
+Tsin = 4.
+eta = 5
 
 # load rx rate_Fs samples
 rx = np.fromfile(args.rx, dtype=np.csingle)*args.gain
@@ -206,7 +208,7 @@ if len(args.write_Ry_smooth):
 
 # TODO: refactor, reorg all these variables and constants
 # TOOD: rationalise ilter constants
-state = "noise"
+state = "idle"
 count = 0
 state_log = np.zeros(sequence_length,dtype=np.int16)
 
@@ -230,61 +232,49 @@ freq_offset = np.zeros(sequence_length,dtype=np.float32)
 delta_hat = np.zeros(sequence_length,dtype=np.float32)
 
 sig_det = np.zeros(sequence_length,dtype=np.int16)
-delta_hat_1 = 0.
+delta_hat_g = 0.
 
 for s in np.arange(1,sequence_length):
 
    prev_state = state
    next_state = state
 
-   if state == "noise":
+   delta_hat_g = np.int16(np.argmax(np.abs(Ry_smooth[s,:])))
+   Ry_max = np.abs(Ry_smooth[s,int(delta_hat_g)])
+   delta_hat_g1 = np.int16(np.argmin(np.abs(Ry_smooth[s,:])))
+   Ry_min = np.abs(Ry_smooth[s,int(delta_hat_g1)])
+   sig_det[s] = Ry_max > Tsig
+   sine_det = Ry_max/Ry_min < Tsin
+
+   if state == "idle":
       state_log[s] = 0
 
-      delta_hat[s] = np.int16(np.argmax(np.abs(Ry_smooth[s,:])))
-      delta_phi = np.angle(Ry_smooth[s,int(delta_hat[s])])
-      freq_offset[s] = -delta_phi*Fs/(2.*np.pi*M)
-      Ry_max = np.abs(Ry_smooth[s,int(delta_hat[s])])
-
-      sig_det[s] = Ry_max > Ts
-      if sig_det[s]:
+      if sig_det[s] and not sine_det:
          count += 1
       else:
          count = 0
-      if count == 5:
-         next_state = "signal"
-         count = 0
-         n_acq += 1
-         frame_sync_even = 0.
-         frame_sync_odd = 0.
 
-   if state == "signal":
+      if count == 5:
+         next_state = "sync"
+         delta_hat[s] = delta_hat_g
+         delta_phi = np.angle(Ry_smooth[s,int(delta_hat_g)])
+         freq_offset[s] = -delta_phi*Fs/(2.*np.pi*M)
+         count = 0
+
+   if state == "sync":
       state_log[s] = 1
 
-      # find delta_hat_1 over a reduced range
-      Ry_max = 0.
-      delta_hat_1 = 0.
-      for gamma in np.arange(int(delta_hat[s-1])-Ncp,int(delta_hat[s-1])+Ncp):
-         gamma1 = gamma
-         if gamma1 < 0:
-            gamma1 += M+Ncp
-         if gamma1 >= M+Ncp:
-            gamma1 -= M+Ncp
-         if np.abs(Ry_smooth[s,gamma1]) > Ry_max:
-            Ry_max = np.abs(Ry_smooth[s,gamma1])
-            delta_hat_1 = gamma1
+      delta_phi = np.angle(Ry_smooth[s,delta_hat_g])
+      freq_offset_g = -delta_phi*Fs/(2.*np.pi*M)
+      delta_hat[s] = beta*delta_hat[s-1] + (1.-beta)*delta_hat_g
+      freq_offset[s] = beta*freq_offset[s-1] + (1.-beta)*freq_offset_g
 
-      delta_phi = np.angle(Ry_smooth[s,delta_hat_1])
-      freq_offset_1 = -delta_phi*Fs/(2.*np.pi*M)
-      sig_det[s] = Ry_max > Ts
-      delta_hat[s] = beta*delta_hat[s-1] + (1.-beta)*delta_hat_1
-      freq_offset[s] = beta*freq_offset[s-1] + (1.-beta)*freq_offset_1
-
-      if not sig_det[s]:
+      if not sig_det[s] or sine_det:
          count += 1
       else:
          count = 0
       if count == args.hangover:
-         next_state = "noise"
+         next_state = "idle"
          count = 0
       
       # adjust timing to point to start of symbol
@@ -323,17 +313,17 @@ for s in np.arange(1,sequence_length):
          if frame_sync_even > frame_sync_odd:
             z_hat[0,i,:] = az_hat
             i += 1
-
-   state = next_state 
    
    frame_sync_log[s,0] = frame_sync_even
    frame_sync_log[s,1] = frame_sync_odd
 
    if args.verbose or state != prev_state:
-      print(f"{s:3d} {i:3d} state: {state:6s} sig_det: {sig_det[s]:1d} count: {count:1d} ", end='', file=sys.stderr)
+      print(f"{s:3d} {i:3d} state: {state:8s} sig_det: {sig_det[s]:1d} sine_det: {sine_det:1d} count: {count:2d} ", end='', file=sys.stderr)
       print(f"fs: {frame_sync_odd > frame_sync_even:d} ", end='', file=sys.stderr)
-      print(f"delta_hat: {delta_hat[s]:3.0f} delta_hat_1: {delta_hat_1:3.0f} ", end='',file=sys.stderr)
-      print(f"f_off: {freq_offset[s]:5.2f}", file=sys.stderr)
+      print(f"delta_hat: {delta_hat[s]:3.0f} delta_hat_g: {delta_hat_g:3.0f} ", end='',file=sys.stderr)
+      print(f"f_off: {freq_offset[s]:5.2f} Ry_max: {Ry_max:5.2f} Ry_min: {Ry_min:5.2f}", file=sys.stderr)
+
+   state = next_state 
 
 # truncate from max length
 z_hat = z_hat[:,:i,:]
