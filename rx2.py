@@ -251,10 +251,6 @@ new_sig_f_hat = 0
 rx_buf = np.zeros(3*(Ncp+M),dtype=np.complex64)
 
 for s in np.arange(1,sequence_length):
-   st = (s+1)*(Ncp+M)
-   en = st + Ncp+M
-   rx_buf[:2*(Ncp+M)] = rx_buf[Ncp+M:]
-   rx_buf[2*(Ncp+M):] = rx[st:en]
    
    # optional AGC, updates on blocks calculated once a symbol, IIR smoothed
    if args.agc:
@@ -265,7 +261,12 @@ for s in np.arange(1,sequence_length):
       gain = max(gain,0.1)
       gain_smooth[s] = gain_smooth[s-1]*alpha_agc + gain*(1.-alpha_agc)
       #print(f"AGC target {target:3.2f} gain_smooth: {gain_smooth[s]:3.2e}")
-      rx[st:en] *= gain
+      rx[st:en] *= gain_smooth[s]
+
+   st = (s+1)*(Ncp+M)
+   en = st + Ncp+M
+   rx_buf[:2*(Ncp+M)] = rx_buf[Ncp+M:]
+   rx_buf[2*(Ncp+M):] = rx[st:en]
 
    # Normalised autocorrelation function
    for gamma in np.arange(Ncp+M):

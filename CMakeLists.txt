@@ -693,11 +693,11 @@ add_test(NAME v2_timing_high_delta2
 add_test(NAME v2_rx2_agc_mpp_high
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
                        ./test/v2_spot.sh --g_file g_mpp.f32 --agc --gain 4")
-         set_tests_properties(v2_rx2_mpp_high PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+         set_tests_properties(v2_rx2_agc_mpp_high PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 add_test(NAME v2_rx2_agc_mpp_low
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
                        delta=0.03 ./test/v2_spot.sh --g_file g_mpp.f32 --EbNodB 6 --agc --gain 0.25")
-         set_tests_properties(v2_rx2_mpp_low PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+         set_tests_properties(v2_rx2_agc_mpp_low PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
 # rx2.sh with complex->real conversions, `ch` tool, and --agc, high SNR, note --gain need to get us in ballpark
 add_test(NAME v2_rx2_ch
