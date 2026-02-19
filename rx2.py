@@ -72,7 +72,7 @@ parser.add_argument('--write_state', type=str, default="", help='path to sync st
 parser.add_argument('--write_frame_sync', type=str, default="", help='path to frame sync output file dim (seq_len,2) in .int16 format')
 parser.add_argument('--read_delta_hat', type=str, default="", help='path to delta_hat input file dim (seq_len) in .f32 format')
 parser.add_argument('--fix_delta_hat', type=int,  default=0, help='disable timing estimation and used fixed delta_hat (default: use timing estimation)')
-parser.add_argument('--write_gain_smooth', type=str, default="", help='path to smoothed AGC output feature file dim (seq_len) .f32 format')
+parser.add_argument('--write_gain', type=str, default="", help='path to AGC output file dim (seq_len) .f32 format')
 parser.set_defaults(bpf=True)
 parser.set_defaults(auxdata=True)
 parser.set_defaults(verbose=True)
@@ -125,7 +125,6 @@ Fs = float(model.Fs)
 agc_target = 1.0*10**(-3/20)
 
 alpha = 0.95
-alpha_agc = 0.995
 beta = 0.999
 Tsig = 0.42
 Tsin = 4.
@@ -240,6 +239,7 @@ n_acq = 0
 # these need to be floats as we IIR filter them over time
 freq_offset = np.zeros(sequence_length,dtype=np.float32)
 delta_hat = np.zeros(sequence_length,dtype=np.float32)
+gain_log = np.zeros(sequence_length,dtype=np.float32)
 
 sig_det = np.zeros(sequence_length,dtype=np.int16)
 delta_hat_g = 0.
@@ -252,6 +252,7 @@ rx_buf = np.zeros(3*(Ncp+M),dtype=np.complex64)
 
 for s in np.arange(1,sequence_length):
    
+   """
    # optional AGC, updates on blocks calculated once a symbol, IIR smoothed
    if args.agc:
       st = (s+1)*(Ncp+M)
@@ -260,14 +261,21 @@ for s in np.arange(1,sequence_length):
       gain = min(gain,10.0)
       gain = max(gain,0.1)
       gain_smooth[s] = gain_smooth[s-1]*alpha_agc + gain*(1.-alpha_agc)
-      #print(f"AGC target {target:3.2f} gain_smooth: {gain_smooth[s]:3.2e}")
-      rx[st:en] *= gain_smooth[s]
+      #print(f"AGC target {agc_target:3.2f} gain_smooth: {gain_smooth[s]:3.2e}")
+      rx[st:en] *= gain
+   """
 
    st = (s+1)*(Ncp+M)
    en = st + Ncp+M
+   gain = 1.0
+   if args.agc:
+      gain = agc_target/(np.sqrt(np.mean(np.abs(rx[st:en])**2)) + 1E-6)
+      gain = min(gain,10.0)
+      gain = max(gain,0.1)
+   gain_log[s] = gain
    rx_buf[:2*(Ncp+M)] = rx_buf[Ncp+M:]
-   rx_buf[2*(Ncp+M):] = rx[st:en]
-
+   rx_buf[2*(Ncp+M):] = rx[st:en]*gain
+ 
    # Normalised autocorrelation function
    for gamma in np.arange(Ncp+M):
       #st = (s)*(Ncp+M) + gamma
@@ -357,10 +365,10 @@ for s in np.arange(1,sequence_length):
          rx_phase_vec[n] = rx_phase
 
       # extract symbol into end of i-th frame
-      st = s*(Ncp+M) + delta_hat_rx
+      st = Ncp+M + delta_hat_rx
       en = st + Ncp+M
       rx_i[:Ncp+M] = rx_i[Ncp+M:]
-      rx_i[Ncp+M:] = torch.tensor(rx_phase_vec*rx[st:en], dtype=torch.complex64)
+      rx_i[Ncp+M:] = torch.tensor(rx_phase_vec*rx_buf[st:en], dtype=torch.complex64)
       # run receiver to extract i-th freq domain OFDM symbols z_hat for one frame
       # Note this is run at symbol rate (twice frame rate) so we can get odd and even stats
       az_hat = model.receiver(rx_i,run_decoder=False)
@@ -408,8 +416,8 @@ if len(args.write_sig_det):
    sig_det.tofile(args.write_sig_det)
 if len(args.write_freq_offset):
    freq_offset.tofile(args.write_freq_offset)
-if len(args.write_gain_smooth):
-   gain_smooth.tofile(args.write_gain_smooth)
+if len(args.write_gain):
+   gain_log.tofile(args.write_gain)
 if len(args.write_state):
    state_log.tofile(args.write_state)
 if len(args.write_frame_sync):
