@@ -84,7 +84,7 @@ The FreeDV Project Leadership Team and many others have helped with support and 
 The script \emph{./compare\_models\_inf.sh -p 260203\_inf} was used to generate loss versus SNR/PNR curves (plotted in Figure \ref{fig:260203_inf_loss_SNR3k_models}) for the following conditions:
 \begin{itemize}
 \item RADE V1 AWGN and MPP channels.
-\item RADE V2 with no timing estimator, state machine, of frequency offset estimator (Genie V2) using \emph{inference.sh}.
+\item RADE V2 with no timing estimator, state machine, or frequency offset estimator (Genie V2) using \emph{inference.sh}.
 \item RADE V2 with real world estimators and state machine using \emph{rx2.sh}.
 \end{itemize}
 
@@ -100,49 +100,6 @@ The performance target for V2 was 3 \si{dB} over V1. Taking into account the PAP
 \scalebox{.9}{\input {260203_inf_loss_PNR3k_models.tex}}
 \end{center}
 \end{figure}
-
-\subsection{AGC}
-
-The script \emph{./compare\_models\_inf.sh -p 260206\_inf} was used to generate loss versus SNR curves for 3 AGC conditions (plotted in Figure \ref{fig:260206_inf_loss_SNR3k_models}) on the worst case MPP channel:
-\begin{enumerate}
-\item Baseline with no AGC.
-\item AGC enabled with +10 \si{dB} gain.
-\item AGC enabled with -10 \si{dB} gain.
-\end{enumerate}
-The AGC curves are coincident with the baseline curve, indicating AGC has a small impact on performance. AGC operation is limited to $\pm 10 \si{dB}$ above the RSM level of 1.0, therefore a manual gain may be required, e.g. to scale from a real $\pm 2^{15}$ gain common with deployments.  AGC adapts over time, so may have a greater impact on loss when tested with shorter samples.
-
-\begin{figure}[h]
-\caption{Loss versus SNR for various AGC conditions.}
-\label{fig:260206_inf_loss_SNR3k_models}
-\begin{center}
-\scalebox{.9}{\input {260206_inf_loss_SNR3k_models.tex}}
-\end{center}
-\end{figure}
-
-\subsection{Acquisition}
-
-Acquisition time was characterised using \emph{v2\_spot.sh}. Note we prepend 1 second of silence in these tests which is subtracted for the reported \emph{acq\_time} to obtain the results in the Table \ref{tab:time_to_acq}.  Acquisition time becomes longer as SNR drops, which is quite acceptable.  High SNR acquisition time on a good channel of 200 \si{ms} is usable (similar to RADE V1) but a little slow given the latency of 40 \si{ms} so as further work it would be nice to improve this.  This is partially due to state machine design that is optimised for low SNR channels.  It maybe possible to modify the state machine to transition quickly if the probability of a valid signal is high, for example sum the probabilities until a threshold is reached rather than waiting $n$ symbols.
-
-\begin{table} [h]
-\caption{Time to acquisition $T_{aq}$.}
-\label{tab:time_to_acq}
-\centering
-\begin{tabular}{ c | c | r | r }
- \hline
- Channel & EbNodB & SNR (\si{dB}) & $T_{aq}$ (ms) \\
- \hline
- AWGN & 100 & 100 & 200 \\
- AWGN & 10 & 3.56 &  240 \\
- AWGN & 1 & -5.44 & 1080 \\
- MPP & 10 & 3.56 & 320 \\
- MPP & 5 & -1.44 & 1040 \\
- \hline
-\end{tabular}
-\end{table}
-
-The probability of false acquisition on noise was tested using \emph{v2\_acq.sh} which plays 600 seconds (10 minutes) of AWGN noise into the \emph{rx2.sh} receiver.  Over several runs there were zero acquisitions in 10 minutes giving mean time to false acquisition $T_{false} > 600 \si{s}$.
-
-The probability of fasle acquisition of noise plus an additive sine wave was also tested with \emph{v2\_acq.sh} using the \emph{--sine} option.  This tests the tendency of the receiver to start decoding audio when there is a carrier wave (e.g a station tuning up) and no valid signal.  A 10 second file of a 1000 Hz sine wave plus noise caused an immediate acquisition, which is a solid fail.  Further work is required to fix this issue and prevent acquisition on sine waves.  Some insight was obtained from a mesh plot of the \emph{Ry\_smooth} surface, which was quite uniform compared to a valid signal.  It may be possible to discard signals based on the surface shape.
 
 \subsection{AWGN, MPP and MPD results}
 
@@ -166,7 +123,99 @@ We would like RADE V2 to successfully decode speech sent over Multipath Disturbe
 \end{tabular}
 \end{table}
 
-TODO: Test acquisition and decode with an additive sine wave present, at x dB dBC.  Should still acquire, OK if some hit in performance.
+\subsection{Acquisition}
+
+Several properties of the acquisition subsystem were tested:
+\begin{enumerate}
+\item Acquisition time from when a RADE V2 signal starts to when it is acquired in various channel conditions.
+\item Probability of false acquisition on noise or single carrier sine wave signals when no RADE V2 signal is present.
+\item Ability to acquire if a sine wave signal is present, the lose sync when the V2 signal ceases.
+\item Ability to re-acquire a 2nd RADE V2 signal (with a different frequency offset and timing) just after the first V2 signal ends.
+\end{enumerate}
+
+Acquisition time was characterised using \emph{v2\_spot.sh}. Note we prepend 1 second of silence in these tests which is subtracted for the reported \emph{acq\_time} to obtain the results in the Table \ref{tab:time_to_acq}.  Acquisition time becomes longer as SNR drops, which is quite acceptable.  High SNR acquisition time on a good channel of 200 \si{ms} is usable (similar to RADE V1) but a little slow given the decoder latency of 40 \si{ms} so as further work it would be nice to improve this.  This is partially due to state machine design that is optimised for low SNR channels.  It may be possible to modify the state machine to transition quickly if the probability of a valid signal is high, for example sum the probabilities until a threshold is reached rather than using a fixed time (state machine counter) to validate the signal.
+
+\begin{table} [h]
+\caption{Time to acquisition $T_{aq}$.}
+\label{tab:time_to_acq}
+\centering
+\begin{tabular}{ c | c | r | r  }
+ \hline
+ Channel & EbNodB & SNR (\si{dB}) & $T_{aq}$ (ms)\\
+ \hline
+ AWGN & 100 & 100 & 200 \\
+ AWGN & 10 & 3.56 &  240 \\
+ AWGN & 1 & -5.44 & 1080 \\
+ MPP & 10 & 3.56 & 320 \\
+ MPP & 5 & -1.44 & 1040\\
+ \hline
+\end{tabular}
+\end{table}
+
+\noindent Example command line for MPP tests:
+
+\begin{verbatim}
+./test/v2_acq.sh --EbNodB 5 --g_file g_mpp.f32
+\end{verbatim}
+
+The probability of false acquisition on noise was tested using \emph{v2\_acq.sh} which plays 600 seconds (10 minutes) of AWGN noise into the \emph{rx2.sh} receiver.  The number of acquisitions \emph{n\_acq} is printed at the end and should be zero. Over several runs there were zero acquisitions in 10 minutes giving mean time to false acquisition $T_{false} > 600 \si{s}$. \\
+
+\noindent Example command lines for acquisition tests:
+
+\begin{verbatim}
+./test/v2_acq.sh --n_secs 600
+./test/v2_acq.sh --n_secs 600 --sine
+./test/v2_acq.sh --n_secs 60 --sine --verbose
+\end{verbatim}
+
+The probability of false acquisition of noise plus an additive sine wave was tested with \emph{v2\_acq.sh} using the \emph{--sine} option.  This tests the tendency of the receiver to start decoding audio when there is a carrier wave (e.g a station tuning up) and no valid signal.  A 1000 Hz sine wave plus noise resulted in no false acquisitions over a 10 minute run which is a pass.
+
+The ability to acquire with an additive sinewave was tested using \emph{v2\_spot.sh}, with results presented in Table \ref{tab:acq_with_sine}.  In all cases acquisition is obtained (sync) with a sine wave and not held (lost sync) with a sine wave once the V2 signal is removed. A sine wave outside of the V2 signal (e.g. 1000 Hz) has only a small impact on loss.  A sine wave inside the V2 signal (e.g. 1505 Hz) has a larger impact on loss but V2 does not fall over - the desired result.  As the sine wave level increases to near the V2 level (approximately 1.0) it eventually becomes impossible to obtain sync.  A successful sync at a sine wave amplitude of 0.5 indicates additive sine waves at up to -6 \si{dBc} are acceptable.
+
+\begin{table} [h]
+\caption{Acquiring and losing sync with additive sine wave}
+\label{tab:acq_with_sine}
+\centering
+\begin{tabular}{ l | c | c | r | r | r | c | c}
+ \hline
+ Channel & Sine Freq (\si{Hz}) & Sine Amp & EbNodB & SNR & Loss & Sync & Lost sync \\
+ \hline
+ AWGN & -    & 0.0 & 100 &  93.5 & 0.080 & Y & Y \\
+ AWGN & 1000 & 0.2 & 100 &  93.5 & 0.083 & Y & Y \\
+ AWGN & 1000 & 0.2 &   3 &  -3.4 & 0.298 & Y & Y \\
+ MPP  & -    & 0.0 & 100 &  93.5 & 0.100 & Y & Y \\
+ MPP  & 1505 & 0.2 & 100 &  93.5 & 0.179 & Y & Y \\
+ MPP  & 1505 & 0.2 &   6 & -0.4 & 0.276 & Y & Y \\
+ AWGN & 1000 & 0.5 &  10 &  3.6 & 0.147 & Y & Y \\
+ AWGN & 1000 & 1.0 &  10 &  3.6 & - & N & N \\
+ \hline
+\end{tabular}
+\end{table}
+
+\noindent Example command lines for acquisition tests with additive sine wave:
+
+\begin{verbatim}
+./test/v2_spot.sh --sine_amp 0.2 --sine_freq 1505 --g_file g_mpp.f32 --verbose
+\end{verbatim}
+
+\subsection{AGC}
+
+The script \emph{./compare\_models\_inf.sh -p 260206\_inf} was used to generate loss versus SNR curves for 3 AGC conditions (plotted in Figure \ref{fig:260206_inf_loss_SNR3k_models}) on the worst case MPP channel:
+\begin{enumerate}
+\item Baseline with no AGC.
+\item AGC enabled with +10 \si{dB} gain.
+\item AGC enabled with -10 \si{dB} gain.
+\end{enumerate}
+The AGC curves are coincident with the baseline curve, indicating AGC has a small impact on performance. AGC operation is limited to $\pm 10 \si{dB}$ above the RSM level of 1.0, therefore a manual gain may be required, e.g. to scale from a real $\pm 2^{15}$ gain common with deployments.  AGC adapts over time, so may have a greater impact on loss when tested with shorter samples.
+
+\begin{figure}[h]
+\caption{Loss versus SNR for various AGC conditions.}
+\label{fig:260206_inf_loss_SNR3k_models}
+\begin{center}
+\scalebox{.9}{\input {260206_inf_loss_SNR3k_models.tex}}
+\end{center}
+\end{figure}
+
 
 \section{Conclusion}
 
