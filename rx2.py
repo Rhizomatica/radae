@@ -247,7 +247,15 @@ freq_offset_g = 0.
 new_sig_delta_hat = 0
 new_sig_f_hat = 0
 
+# M unused samples at start of buffer, but allows us to use index convention from write up
+rx_buf = np.zeros(3*(Ncp+M),dtype=np.complex64)
+
 for s in np.arange(1,sequence_length):
+   st = (s+1)*(Ncp+M)
+   en = st + Ncp+M
+   rx_buf[:2*(Ncp+M)] = rx_buf[Ncp+M:]
+   rx_buf[2*(Ncp+M):] = rx[st:en]
+   
    # optional AGC, updates on blocks calculated once a symbol, IIR smoothed
    if args.agc:
       st = (s+1)*(Ncp+M)
@@ -261,11 +269,13 @@ for s in np.arange(1,sequence_length):
 
    # Normalised autocorrelation function
    for gamma in np.arange(Ncp+M):
-      st = (s+1)*(Ncp+M) + gamma
-      y_cp = rx[st-Ncp:st]
-      y_m = rx[st-Ncp+M:st+M]
+      #st = (s)*(Ncp+M) + gamma
+      st = Ncp+M+gamma
+      y_cp = rx_buf[st-Ncp:st]
+      y_m = rx_buf[st-Ncp+M:st+M]
       Ry = np.dot(y_cp, np.conj(y_m))
-      D = np.dot(y_cp, np.conj(y_cp)) + np.dot(y_m, np.conj(y_m))
+      D = np.dot(y_cp, np.conj(y_cp)) + np.dot(y_m, np.conj(y_m)) + 1E-12
+      #print(Ry,D)
       Ry_norm[s,gamma] = 2.*Ry/np.abs(D)
 
    # IIR smoothing
@@ -281,7 +291,7 @@ for s in np.arange(1,sequence_length):
    delta_hat_g1 = np.int16(np.argmin(np.abs(Ry_smooth[s,:])))
    Ry_min = np.abs(Ry_smooth[s,int(delta_hat_g1)])
    sig_det[s] = Ry_max > Tsig
-   sine_det = Ry_max/Ry_min < Tsin
+   sine_det = Ry_max/(Ry_min+1E-12) < Tsin
    
    if state == "idle":
       state_log[s] = 0
