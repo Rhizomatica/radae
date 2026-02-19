@@ -33,6 +33,7 @@ sine_amp=""
 a_sine_amp=""
 sine_freq=""
 a_sine_freq=""
+prepend_signal2=0
 POSITIONAL=()
 while [[ $# -gt 0 ]]
 do
@@ -70,6 +71,10 @@ case $key in
     -h)
         print_help	
     ;;
+    --prepend_signal2)
+        prepend_signal2=1	
+        shift
+    ;;
     *)
     POSITIONAL+=("$1") # save it in an array for later
     shift
@@ -83,15 +88,26 @@ set -- "${POSITIONAL[@]}" # restore positional parameters
 --prepend_noise $a_prepend_noise --append_noise 2 --freq_offset 25 --correct_freq_offset \
 $g_file $a_g_file $EbNodB $a_EbNodB_value $sine_amp $a_sine_amp $sine_freq $a_sine_freq
 
+# optional pre-pending of a 2nd RADE V2 signal to test state machine with two sucessive signals
+if [ "$prepend_signal2" -eq 1 ]; then
+    ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/brian_g8sez.wav /dev/null --rate_Fs --latent-dim 56 \
+    --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 --write_rx brian_rx.f32 \
+    --prepend_noise 1.0 --freq_offset -25 --correct_freq_offset \
+    $g_file $a_g_file $EbNodB $a_EbNodB_value $sine_amp $a_sine_amp $sine_freq $a_sine_freq
+    tmp=$(mktemp)
+    cat brian_rx.f32 250725_rx.f32 > $tmp
+    cp $tmp 250725_rx.f32
+fi
+
 # debug tips:
-# 1) Use Octave to plot internal states, e.g. 
+# 1) Use Octave (or uour plotting tool of choice) to plot internal states, e.g. 
 # octave> figure(1); clf; sig_det=load_raw('sig_det.int16'); plot(sig_det); state=load_raw('state.int16'); \
 # hold on; plot(state*1.5); hold off; \
-# figure(2); freq_offset_smooth=load_f32('freq_offset_smooth.f32',1); plot(freq_offset_smooth);
+# figure(2); freq_offset=load_f32('freq_offset.f32',1); plot(freq_offset);
 # 2) remove --quiet and look for state transitions (e.g. back to noise), which upsets alignment for loss.py
 ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync 250725_rx.f32 /dev/null --latent-dim 56 \
 --w1_dec 128 --correct_time_offset -8 --quiet \
---write_sig_det sig_det.int16 --write_state state.int16 --write_freq_offset freq_offset_smooth.f32 \
+--write_sig_det sig_det.int16 --write_state state.int16 --write_freq_offset freq_offset.f32 \
 --write_frame_sync frame_sync.f32 $@
 
 # debug tip: run from cmd line with --plot
