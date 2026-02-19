@@ -85,6 +85,7 @@ parser.add_argument('--test_mode', action='store_true', help='inject test delta 
 parser.add_argument('--hangover', type=int, default=75, help='Number of symbols of no signal before returning to noise state (default 75)')
 parser.add_argument('--quiet', action='store_false', dest='verbose', help='inject test delta sequence')
 parser.add_argument('--verbose', action='store_true', dest='verbose', help='inject test delta sequence')
+parser.add_argument('--stop_at', type=int, default=0, help='exit program after this many symbols (default disabled)')
 args = parser.parse_args()
 
 # make sure we don't use a GPU
@@ -210,6 +211,7 @@ if len(args.write_Ry_smooth):
 # TOOD: rationalise ilter constants
 state = "idle"
 count = 0
+count1 = 0
 state_log = np.zeros(sequence_length,dtype=np.int16)
 
 frame_sync_log = np.zeros((sequence_length,2),dtype=np.float32)
@@ -233,6 +235,9 @@ delta_hat = np.zeros(sequence_length,dtype=np.float32)
 
 sig_det = np.zeros(sequence_length,dtype=np.int16)
 delta_hat_g = 0.
+freq_offset_g = 0.
+new_sig_delta_hat = 0
+new_sig_f_hat = 0
 
 for s in np.arange(1,sequence_length):
 
@@ -245,7 +250,7 @@ for s in np.arange(1,sequence_length):
    Ry_min = np.abs(Ry_smooth[s,int(delta_hat_g1)])
    sig_det[s] = Ry_max > Tsig
    sine_det = Ry_max/Ry_min < Tsin
-
+   
    if state == "idle":
       state_log[s] = 0
 
@@ -260,6 +265,8 @@ for s in np.arange(1,sequence_length):
          delta_phi = np.angle(Ry_smooth[s,int(delta_hat_g)])
          freq_offset[s] = -delta_phi*Fs/(2.*np.pi*M)
          count = 0
+         count1 = 0
+         n_acq += 1
 
    if state == "sync":
       state_log[s] = 1
@@ -269,13 +276,31 @@ for s in np.arange(1,sequence_length):
       delta_hat[s] = beta*delta_hat[s-1] + (1.-beta)*delta_hat_g
       freq_offset[s] = beta*freq_offset[s-1] + (1.-beta)*freq_offset_g
 
+      # if no signal of a sine wave we may have lost of RADE signal
       if not sig_det[s] or sine_det:
          count += 1
       else:
          count = 0
+      # hangover quite long so we can ride over fades (where sig_det will be patchy) without a re-sync
       if count == args.hangover:
          next_state = "idle"
          count = 0
+         count1 = 0
+
+      """
+      new_sig_delta_hat = np.abs(delta_hat_g - delta_hat[s-1) > Ncp
+      new_sig_f_hat = np.abs(freq_offset_g -  freq_offset[s-1]) > 5.
+      if sig_det[s] and (new_sig_delta_hat or new_sig_f_hat):
+         count1 += 1
+      else:
+         count1 = 0
+      
+      # if a new signal is detected we can un-sync quickly
+      if count1 == 5:
+         next_state = "idle"
+         count = 0
+         count1 = 0
+      """
       
       # adjust timing to point to start of symbol
       delta_hat_rx = int(delta_hat[s]-Ncp)
@@ -318,12 +343,15 @@ for s in np.arange(1,sequence_length):
    frame_sync_log[s,1] = frame_sync_odd
 
    if args.verbose or state != prev_state:
-      print(f"{s:3d} {i:3d} state: {state:8s} sig_det: {sig_det[s]:1d} sine_det: {sine_det:1d} count: {count:2d} ", end='', file=sys.stderr)
+      print(f"{s:4d} {i:4d} state: {state:5s} sig: {sig_det[s]:1d} sine: {sine_det:1d} c: {count:2d} nsd: {new_sig_delta_hat:1d} nsf: {new_sig_f_hat:1d} c1: {count1:2d} ", end='', file=sys.stderr)
       print(f"fs: {frame_sync_odd > frame_sync_even:d} ", end='', file=sys.stderr)
       print(f"delta_hat: {delta_hat[s]:3.0f} delta_hat_g: {delta_hat_g:3.0f} ", end='',file=sys.stderr)
-      print(f"f_off: {freq_offset[s]:5.2f} Ry_max: {Ry_max:5.2f} Ry_min: {Ry_min:5.2f}", file=sys.stderr)
+      print(f"f_off: {freq_offset[s]:5.2f} f_off_g: {freq_offset_g:5.2f} Ry_max: {Ry_max:5.2f} Ry_min: {Ry_min:5.2f}", file=sys.stderr)
 
    state = next_state 
+
+   if s == args.stop_at:
+      quit()
 
 # truncate from max length
 z_hat = z_hat[:,:i,:]
@@ -359,4 +387,4 @@ features_hat.tofile(args.features_hat)
 if len(args.write_latent):
    z_hat.cpu().detach().numpy().flatten().astype('float32').tofile(args.write_latent)
 
-print(f"n_acd: {n_acq:d}")
+print(f"n_acq: {n_acq:d}")
