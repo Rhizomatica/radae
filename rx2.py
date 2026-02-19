@@ -121,12 +121,14 @@ Nc = model.Nc
 w = model.w.cpu().detach().numpy()
 Fs = float(model.Fs)
 
+# target RMS level is PAPR ~ 3 dB less than peak of 1.0
+agc_target = 1.0*10**(-3/20)
+
 alpha = 0.95
 alpha_agc = 0.995
 beta = 0.999
 Tsig = 0.42
 Tsin = 4.
-eta = 5
 
 # load rx rate_Fs samples
 rx = np.fromfile(args.rx, dtype=np.csingle)*args.gain
@@ -165,29 +167,31 @@ if args.plots:
    input("hit[enter] to end.")
    plt.close('all')
 
-
 # Acquisition - timing, freq offset, and signal present estimates
 
 sequence_length = len(rx)//(Ncp+M) - 2
 print(sequence_length)
 
-# optional AGC, updates on blocks calculated once a symbol, IIR smoothed
 gain_smooth = np.ones(sequence_length,dtype=np.float32)
+
+"""
+# optional AGC, updates on blocks calculated once a symbol, IIR smoothed
 if args.agc:
    # target RMS level is PAPR ~ 3 dB less than peak of 1.0
-   target = 1.0*10**(-3/20)
    for s in np.arange(1,sequence_length):
       st = (s+1)*(Ncp+M)
       en = st + Ncp+M
-      gain = target/(np.sqrt(np.mean(np.abs(rx[st:en])**2)) + 1E-6)
+      gain = agc_target/(np.sqrt(np.mean(np.abs(rx[st:en])**2)) + 1E-6)
       gain = min(gain,10.0)
       gain = max(gain,0.1)
       gain_smooth[s] = gain_smooth[s-1]*alpha_agc + gain*(1.-alpha_agc)
       #print(f"AGC target {target:3.2f} gain_smooth: {gain_smooth[s]:3.2e}")
       rx[st:en] *= gain
+"""
 
 # Normalised autocorrelation function
 Ry_norm = np.zeros((sequence_length,Ncp+M),dtype=np.complex64)
+"""
 for s in np.arange(sequence_length):
    for delta_hat in np.arange(Ncp+M):
       st = (s+1)*(Ncp+M) + delta_hat
@@ -196,19 +200,23 @@ for s in np.arange(sequence_length):
       Ry = np.dot(y_cp, np.conj(y_m))
       D = np.dot(y_cp, np.conj(y_cp)) + np.dot(y_m, np.conj(y_m))
       Ry_norm[s,delta_hat] = 2.*Ry/np.abs(D)
+"""
 
 if len(args.write_Ry_norm):
    Ry_norm.flatten().tofile(args.write_Ry_norm)
 
+Ry_smooth = np.zeros((sequence_length,Ncp+M),dtype=np.complex64)
+"""
 # IIR smoothing
 Ry_smooth = np.zeros((sequence_length,Ncp+M),dtype=np.complex64)
 for s in np.arange(1,sequence_length):
    Ry_smooth[s,:] = Ry_smooth[s-1,:]*alpha + Ry_norm[s,:]*(1.-alpha)
 if len(args.write_Ry_smooth):
    Ry_smooth.flatten().tofile(args.write_Ry_smooth)
+"""
 
 # TODO: refactor, reorg all these variables and constants
-# TOOD: rationalise ilter constants
+# TOOD: rationalise filter constants
 state = "idle"
 count = 0
 count1 = 0
@@ -240,6 +248,30 @@ new_sig_delta_hat = 0
 new_sig_f_hat = 0
 
 for s in np.arange(1,sequence_length):
+   # optional AGC, updates on blocks calculated once a symbol, IIR smoothed
+   if args.agc:
+      st = (s+1)*(Ncp+M)
+      en = st + Ncp+M
+      gain = agc_target/(np.sqrt(np.mean(np.abs(rx[st:en])**2)) + 1E-6)
+      gain = min(gain,10.0)
+      gain = max(gain,0.1)
+      gain_smooth[s] = gain_smooth[s-1]*alpha_agc + gain*(1.-alpha_agc)
+      #print(f"AGC target {target:3.2f} gain_smooth: {gain_smooth[s]:3.2e}")
+      rx[st:en] *= gain
+
+   # Normalised autocorrelation function
+   for gamma in np.arange(Ncp+M):
+      st = (s+1)*(Ncp+M) + gamma
+      y_cp = rx[st-Ncp:st]
+      y_m = rx[st-Ncp+M:st+M]
+      Ry = np.dot(y_cp, np.conj(y_m))
+      D = np.dot(y_cp, np.conj(y_cp)) + np.dot(y_m, np.conj(y_m))
+      Ry_norm[s,gamma] = 2.*Ry/np.abs(D)
+
+   # IIR smoothing
+   Ry_smooth[s,:] = Ry_smooth[s-1,:]*alpha + Ry_norm[s,:]*(1.-alpha)
+
+   # Iterate acquisition (sync) state machine
 
    prev_state = state
    next_state = state
@@ -288,6 +320,7 @@ for s in np.arange(1,sequence_length):
          count1 = 0
 
       """
+      TODO: come back to this corner case later
       new_sig_delta_hat = np.abs(delta_hat_g - delta_hat[s-1) > Ncp
       new_sig_f_hat = np.abs(freq_offset_g -  freq_offset[s-1]) > 5.
       if sig_det[s] and (new_sig_delta_hat or new_sig_f_hat):
@@ -301,7 +334,7 @@ for s in np.arange(1,sequence_length):
          count = 0
          count1 = 0
       """
-      
+
       # adjust timing to point to start of symbol
       delta_hat_rx = int(delta_hat[s]-Ncp)
 
