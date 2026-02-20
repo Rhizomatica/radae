@@ -200,8 +200,10 @@ Ry_smooth = np.zeros((Ncp+M),dtype=np.complex64)
 Ry_smooth_log = np.zeros((sequence_length,Ncp+M),dtype=np.complex64)
 
 # these need to be floats as we IIR filter them over time
-freq_offset = np.zeros(sequence_length,dtype=np.float32)
-delta_hat = np.zeros(sequence_length,dtype=np.float32)
+freq_offset = 0.0
+delta_hat = 0.
+freq_offset_log = np.zeros(sequence_length,dtype=np.float32)
+delta_hat_log = np.zeros(sequence_length,dtype=np.float32)
 
 gain_log = np.zeros(sequence_length,dtype=np.float32)
 
@@ -269,9 +271,11 @@ for s in np.arange(1,sequence_length):
 
       if count == 5:
          next_state = "sync"
-         delta_hat[s] = delta_hat_g
+         delta_hat = delta_hat_g
+         delta_hat_log[s] = delta_hat
          delta_phi = np.angle(Ry_smooth[int(delta_hat_g)])
-         freq_offset[s] = -delta_phi*Fs/(2.*np.pi*M)
+         freq_offset = -delta_phi*Fs/(2.*np.pi*M)
+         freq_offset_log[s] = freq_offset
          count = 0
          count1 = 0
          n_acq += 1
@@ -281,8 +285,10 @@ for s in np.arange(1,sequence_length):
 
       delta_phi = np.angle(Ry_smooth[delta_hat_g])
       freq_offset_g = -delta_phi*Fs/(2.*np.pi*M)
-      delta_hat[s] = beta*delta_hat[s-1] + (1.-beta)*delta_hat_g
-      freq_offset[s] = beta*freq_offset[s-1] + (1.-beta)*freq_offset_g
+      delta_hat = beta*delta_hat + (1.-beta)*delta_hat_g
+      delta_hat_log[s] = delta_hat
+      freq_offset = beta*freq_offset + (1.-beta)*freq_offset_g
+      freq_offset_log[s] = freq_offset
 
       # if no signal of a sine wave we may have lost of RADE signal
       if not sig_det[s] or sine_det:
@@ -312,10 +318,10 @@ for s in np.arange(1,sequence_length):
       """
 
       # adjust timing to point to start of symbol
-      delta_hat_rx = int(delta_hat[s]-Ncp)
+      delta_hat_rx = int(delta_hat-Ncp)
 
       # set up phase continous vector to correct freq offset
-      freq_offset_rx = freq_offset[s]
+      freq_offset_rx = freq_offset
       w = 2*np.pi*freq_offset_rx/Fs
       for n in range(Ncp+M):
          rx_phase = rx_phase*np.exp(-1j*w)
