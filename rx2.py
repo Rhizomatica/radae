@@ -61,7 +61,6 @@ parser.add_argument('--stateful',  action='store_true', help='use stateful core 
 parser.add_argument('--xcorr_dimension', type=int, help='Dimension of Input cross-correlation (fine timing)',default = 160,required = False)
 parser.add_argument('--gru_dim', type=int, help='GRU Dimension (fine timing)',default = 64,required = False)
 parser.add_argument('--output_dim', type=int, help='Output dimension (fine timing)',default = 160,required = False)
-parser.add_argument('--write_Ry_norm', type=str, default="", help='path to normalised autocorrelation output feature file dim (seq_len,Ncp+M) .c64 format')
 parser.add_argument('--write_Ry_smooth', type=str, default="", help='path to smoothed autocorrelation output feature file dim (seq_len,Ncp+M) .c64 format')
 parser.add_argument('--write_delta_hat', type=str, default="", help='path to delta_hat output file dim (seq_len) in .int16 format')
 parser.add_argument('--write_Ry_max', type=str, default="", help='path to Ty_max output file dim (seq_len) in .f32 format')
@@ -171,8 +170,6 @@ if args.plots:
 sequence_length = len(rx)//(Ncp+M) - 2
 print(sequence_length)
 
-Ry_norm = np.zeros((sequence_length,Ncp+M),dtype=np.complex64)
-Ry_smooth = np.zeros((sequence_length,Ncp+M),dtype=np.complex64)
 
 # TODO: refactor, reorg all these variables and constants
 # TODO: rationalise filter constants
@@ -197,6 +194,11 @@ z_hat = torch.zeros((1,sequence_length, model.latent_dim), dtype=torch.float32)
 i = 0
 n_acq = 0
 
+Ry_norm = np.zeros((Ncp+M),dtype=np.complex64)
+Ry_norm_log = np.zeros((sequence_length,Ncp+M),dtype=np.complex64)
+Ry_smooth = np.zeros((Ncp+M),dtype=np.complex64)
+Ry_smooth_log = np.zeros((sequence_length,Ncp+M),dtype=np.complex64)
+
 # these need to be floats as we IIR filter them over time
 freq_offset = np.zeros(sequence_length,dtype=np.float32)
 delta_hat = np.zeros(sequence_length,dtype=np.float32)
@@ -210,22 +212,26 @@ new_sig_delta_hat = 0
 new_sig_f_hat = 0
 
 nin = Ncp+M
+prx = 0
 
 # M unused samples at start of buffer, but allows us to use index convention from write up
 rx_buf = np.zeros(3*(Ncp+M),dtype=np.complex64)
 
 for s in np.arange(1,sequence_length):
    
-   st = (s)*(Ncp+M)
-   en = st + Ncp+M
+   #st = (s)*(Ncp+M)
+   st = prx
+   en = st + nin
+   prx += nin
+
    gain = 1.0
    if args.agc:
       gain = agc_target/(np.sqrt(np.mean(np.abs(rx[st:en])**2)) + 1E-6)
       gain = min(gain,10.0)
       gain = max(gain,0.1)
    gain_log[s] = gain
-   rx_buf[:2*(Ncp+M)] = rx_buf[Ncp+M:]
-   rx_buf[2*(Ncp+M):] = rx[st:en]*gain
+   rx_buf[:3*(Ncp+M)-nin] = rx_buf[nin:]
+   rx_buf[3*(Ncp+M)-nin:] = rx[st:en]*gain
  
    # Normalised autocorrelation function
    for gamma in np.arange(Ncp+M):
@@ -234,20 +240,22 @@ for s in np.arange(1,sequence_length):
       y_m = rx_buf[st-Ncp+M:st+M]
       Ry = np.dot(y_cp, np.conj(y_m))
       D = np.dot(y_cp, np.conj(y_cp)) + np.dot(y_m, np.conj(y_m)) + 1E-12
-      Ry_norm[s,gamma] = 2.*Ry/np.abs(D)
+      Ry_norm[gamma] = 2.*Ry/np.abs(D)
+   Ry_norm_log[s,:] = Ry_norm
 
    # IIR smoothing
-   Ry_smooth[s,:] = Ry_smooth[s-1,:]*alpha + Ry_norm[s,:]*(1.-alpha)
+   Ry_smooth = Ry_smooth*alpha + Ry_norm*(1.-alpha)
+   Ry_smooth_log[s,:] = Ry_smooth
 
    # Iterate acquisition (sync) state machine
 
    prev_state = state
    next_state = state
 
-   delta_hat_g = np.int16(np.argmax(np.abs(Ry_smooth[s,:])))
-   Ry_max = np.abs(Ry_smooth[s,int(delta_hat_g)])
-   delta_hat_g1 = np.int16(np.argmin(np.abs(Ry_smooth[s,:])))
-   Ry_min = np.abs(Ry_smooth[s,int(delta_hat_g1)])
+   delta_hat_g = np.int16(np.argmax(np.abs(Ry_smooth)))
+   Ry_max = np.abs(Ry_smooth[int(delta_hat_g)])
+   delta_hat_g1 = np.int16(np.argmin(np.abs(Ry_smooth)))
+   Ry_min = np.abs(Ry_smooth[int(delta_hat_g1)])
    sig_det[s] = Ry_max > Tsig
    sine_det = Ry_max/(Ry_min+1E-12) < Tsin
    
@@ -262,7 +270,7 @@ for s in np.arange(1,sequence_length):
       if count == 5:
          next_state = "sync"
          delta_hat[s] = delta_hat_g
-         delta_phi = np.angle(Ry_smooth[s,int(delta_hat_g)])
+         delta_phi = np.angle(Ry_smooth[int(delta_hat_g)])
          freq_offset[s] = -delta_phi*Fs/(2.*np.pi*M)
          count = 0
          count1 = 0
@@ -271,7 +279,7 @@ for s in np.arange(1,sequence_length):
    if state == "sync":
       state_log[s] = 1
 
-      delta_phi = np.angle(Ry_smooth[s,delta_hat_g])
+      delta_phi = np.angle(Ry_smooth[delta_hat_g])
       freq_offset_g = -delta_phi*Fs/(2.*np.pi*M)
       delta_hat[s] = beta*delta_hat[s-1] + (1.-beta)*delta_hat_g
       freq_offset[s] = beta*freq_offset[s-1] + (1.-beta)*freq_offset_g
@@ -357,8 +365,8 @@ for s in np.arange(1,sequence_length):
 # truncate from max length
 z_hat = z_hat[:,:i,:]
 
-if len(args.write_Ry_norm):
-   Ry_norm.flatten().tofile(args.write_Ry_norm)
+if len(args.write_Ry_smooth):
+   Ry_smooth_log.flatten().tofile(args.write_Ry_norm)
 if len(args.write_delta_hat):
    delta_hat.tofile(args.write_delta_hat)
 if len(args.write_Ry_max):
