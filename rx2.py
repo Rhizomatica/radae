@@ -85,6 +85,7 @@ parser.add_argument('--hangover', type=int, default=75, help='Number of symbols 
 parser.add_argument('--quiet', action='store_false', dest='verbose', help='inject test delta sequence')
 parser.add_argument('--verbose', action='store_true', dest='verbose', help='inject test delta sequence')
 parser.add_argument('--stop_at', type=int, default=0, help='exit program after this many symbols (default disabled)')
+parser.add_argument('--timing_adj_at', type=int, default=0, help='enable timing adjust after this many symbols (default disabled)')
 args = parser.parse_args()
 
 # make sure we don't use a GPU
@@ -167,7 +168,7 @@ if args.plots:
 
 # Acquisition - timing, freq offset, and signal present estimates
 
-sequence_length = len(rx)//(Ncp+M) - 2
+sequence_length = len(rx)//(Ncp+M)
 print(sequence_length)
 
 
@@ -207,7 +208,8 @@ delta_hat_log = np.zeros(sequence_length,dtype=np.float32)
 
 gain_log = np.zeros(sequence_length,dtype=np.float32)
 
-sig_det = np.zeros(sequence_length,dtype=np.int16)
+sig_det = 0
+sig_det_log = np.zeros(sequence_length,dtype=np.int16)
 delta_hat_g = 0.
 freq_offset_g = 0.
 new_sig_delta_hat = 0
@@ -215,26 +217,27 @@ new_sig_f_hat = 0
 
 nin = Ncp+M
 prx = 0
+s = 0
+timing_adj = 0
 
 # M unused samples at start of buffer, but allows us to use index convention from write up
 rx_buf = np.zeros(3*(Ncp+M),dtype=np.complex64)
 
-for s in np.arange(1,sequence_length):
-   
-   #st = (s)*(Ncp+M)
+while prx + nin < len(rx):
+   s += 1
    st = prx
    en = st + nin
    prx += nin
-
+   
    gain = 1.0
    if args.agc:
       gain = agc_target/(np.sqrt(np.mean(np.abs(rx[st:en])**2)) + 1E-6)
       gain = min(gain,10.0)
       gain = max(gain,0.1)
-   gain_log[s] = gain
    rx_buf[:3*(Ncp+M)-nin] = rx_buf[nin:]
    rx_buf[3*(Ncp+M)-nin:] = rx[st:en]*gain
- 
+   nin = Ncp+M
+
    # Normalised autocorrelation function
    for gamma in np.arange(Ncp+M):
       st = Ncp+M+gamma
@@ -243,11 +246,9 @@ for s in np.arange(1,sequence_length):
       Ry = np.dot(y_cp, np.conj(y_m))
       D = np.dot(y_cp, np.conj(y_cp)) + np.dot(y_m, np.conj(y_m)) + 1E-12
       Ry_norm[gamma] = 2.*Ry/np.abs(D)
-   Ry_norm_log[s,:] = Ry_norm
 
    # IIR smoothing
    Ry_smooth = Ry_smooth*alpha + Ry_norm*(1.-alpha)
-   Ry_smooth_log[s,:] = Ry_smooth
 
    # Iterate acquisition (sync) state machine
 
@@ -258,13 +259,12 @@ for s in np.arange(1,sequence_length):
    Ry_max = np.abs(Ry_smooth[int(delta_hat_g)])
    delta_hat_g1 = np.int16(np.argmin(np.abs(Ry_smooth)))
    Ry_min = np.abs(Ry_smooth[int(delta_hat_g1)])
-   sig_det[s] = Ry_max > Tsig
+   sig_det = Ry_max > Tsig
    sine_det = Ry_max/(Ry_min+1E-12) < Tsin
    
    if state == "idle":
-      state_log[s] = 0
 
-      if sig_det[s] and not sine_det:
+      if sig_det and not sine_det:
          count += 1
       else:
          count = 0
@@ -272,26 +272,22 @@ for s in np.arange(1,sequence_length):
       if count == 5:
          next_state = "sync"
          delta_hat = delta_hat_g
-         delta_hat_log[s] = delta_hat
          delta_phi = np.angle(Ry_smooth[int(delta_hat_g)])
          freq_offset = -delta_phi*Fs/(2.*np.pi*M)
-         freq_offset_log[s] = freq_offset
          count = 0
          count1 = 0
          n_acq += 1
 
    if state == "sync":
-      state_log[s] = 1
 
       delta_phi = np.angle(Ry_smooth[delta_hat_g])
       freq_offset_g = -delta_phi*Fs/(2.*np.pi*M)
+
       delta_hat = beta*delta_hat + (1.-beta)*delta_hat_g
-      delta_hat_log[s] = delta_hat
       freq_offset = beta*freq_offset + (1.-beta)*freq_offset_g
-      freq_offset_log[s] = freq_offset
 
       # if no signal of a sine wave we may have lost of RADE signal
-      if not sig_det[s] or sine_det:
+      if not sig_det or sine_det:
          count += 1
       else:
          count = 0
@@ -302,10 +298,10 @@ for s in np.arange(1,sequence_length):
          count1 = 0
 
       """
-      TODO: come back to this corner case later
-      new_sig_delta_hat = np.abs(delta_hat_g - delta_hat[s-1) > Ncp
-      new_sig_f_hat = np.abs(freq_offset_g -  freq_offset[s-1]) > 5.
-      if sig_det[s] and (new_sig_delta_hat or new_sig_f_hat):
+      # TODO: come back to this corner case later
+      new_sig_delta_hat = np.abs(delta_hat_g - delta_hat) > Ncp
+      new_sig_f_hat = np.abs(freq_offset_g -  freq_offset) > 5.
+      if sig_det and (new_sig_delta_hat or new_sig_f_hat):
          count1 += 1
       else:
          count1 = 0
@@ -354,14 +350,47 @@ for s in np.arange(1,sequence_length):
             z_hat[0,i,:] = az_hat
             i += 1
    
-   frame_sync_log[s,0] = frame_sync_even
-   frame_sync_log[s,1] = frame_sync_odd
+      if timing_adj:
+         # keep timing centered in symbol to avoid wrap around issues near 0 or Ncp+M
+         # which would cause loss of frame sync
+         shift = (Ncp+M)//4
+         if delta_hat > 3*(Ncp+M)//4:
+            delta_hat -= shift
+            # rotate Ry_smooth towards 0
+            tmp = np.array(Ry_smooth[:shift])
+            Ry_smooth[:Ncp+M-shift] = Ry_smooth[shift:]
+            Ry_smooth[Ncp+M-shift:] = tmp
+            nin = Ncp+M + shift
+         if delta_hat < (Ncp+M)//4:
+            delta_hat += shift
+            # rotate Ry_smooth towards Ncp+M
+            tmp = np.array(Ry_smooth[Ncp+M-shift:])
+            Ry_smooth[shift:] = Ry_smooth[:Ncp+M-shift]
+            Ry_smooth[:shift] = tmp
+            nin = Ncp+M - shift
+      
+   if s > args.timing_adj_at:
+      timing_adj = 1
+
+   if s < sequence_length:
+      if state == "idle":
+         state_log[s] = 0
+      else:
+         state_log[s] = 1
+      gain_log[s] = gain
+      Ry_norm_log[s,:] = Ry_norm
+      Ry_smooth_log[s,:] = Ry_smooth
+      sig_det_log[s] = sig_det
+      delta_hat_log[s] = delta_hat
+      freq_offset_log[s] = freq_offset
+      frame_sync_log[s,0] = frame_sync_even
+      frame_sync_log[s,1] = frame_sync_odd
 
    if args.verbose or state != prev_state:
-      print(f"{s:4d} {i:4d} state: {state:5s} sig: {sig_det[s]:1d} sine: {sine_det:1d} c: {count:2d} nsd: {new_sig_delta_hat:1d} nsf: {new_sig_f_hat:1d} c1: {count1:2d} ", end='', file=sys.stderr)
+      print(f"{s:4d} {i:4d} state: {state:5s} sig: {sig_det:1d} sine: {sine_det:1d} c: {count:2d} nsd: {new_sig_delta_hat:1d} nsf: {new_sig_f_hat:1d} c1: {count1:2d} ", end='', file=sys.stderr)
       print(f"fs: {frame_sync_odd > frame_sync_even:d} ", end='', file=sys.stderr)
-      print(f"delta_hat: {delta_hat[s]:3.0f} delta_hat_g: {delta_hat_g:3.0f} ", end='',file=sys.stderr)
-      print(f"f_off: {freq_offset[s]:5.2f} f_off_g: {freq_offset_g:5.2f} Ry_max: {Ry_max:5.2f} Ry_min: {Ry_min:5.2f}", file=sys.stderr)
+      print(f"delta_hat: {delta_hat:3.0f} delta_hat_g: {delta_hat_g:3.0f} ", end='',file=sys.stderr)
+      print(f"f_off: {freq_offset:5.2f} f_off_g: {freq_offset_g:5.2f} Ry_max: {Ry_max:5.2f} Ry_min: {Ry_min:5.2f}", file=sys.stderr)
 
    state = next_state 
 
@@ -372,15 +401,13 @@ for s in np.arange(1,sequence_length):
 z_hat = z_hat[:,:i,:]
 
 if len(args.write_Ry_smooth):
-   Ry_smooth_log.flatten().tofile(args.write_Ry_norm)
+   Ry_smooth_log.flatten().tofile(args.write_Ry_smooth)
 if len(args.write_delta_hat):
-   delta_hat.tofile(args.write_delta_hat)
-if len(args.write_Ry_max):
-   Ry_max.tofile(args.write_Ry_max)
+   delta_hat_log.tofile(args.write_delta_hat)
 if len(args.write_sig_det):
-   sig_det.tofile(args.write_sig_det)
+   sig_det_log.tofile(args.write_sig_det)
 if len(args.write_freq_offset):
-   freq_offset.tofile(args.write_freq_offset)
+   freq_offset_log.tofile(args.write_freq_offset)
 if len(args.write_gain):
    gain_log.tofile(args.write_gain)
 if len(args.write_state):
