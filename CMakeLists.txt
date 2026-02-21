@@ -688,6 +688,36 @@ add_test(NAME v2_timing_high_delta2
                        delta=0.05 ./test/v2_timing.sh --g_file g_mpp_high.f32 --correct_time_offset -8 --fix_delta_hat 48 --quiet")
          set_tests_properties(v2_timing_high_delta2 PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
+# dealing with sample clock differences --------------------------
+
+# useful visualisation:
+#  octave:573> Ry_smooth=load_c64('Ry_smooth.c64',160); figure(2); mesh(abs(Ry_smooth(1:600,:)))
+#  octave:574> delta_hat=load_f32('delta_hat.f32',1); figure(1); clf; plot(delta_hat);
+
+# shift delta backwards logic
+add_test(NAME v2_rx2_samclk_back
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
+                       ./test/v2_spot.sh --pad_samples 70 --write_Ry_smooth Ry_smooth.c64")
+         set_tests_properties(v2_rx2_samclk_back PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+# shift delta forward logic
+add_test(NAME v2_rx2_samclk_fwd
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
+                       ./test/v2_spot.sh --pad_samples 90 --write_Ry_smooth Ry_smooth.c64")
+         set_tests_properties(v2_rx2_samclk_fwd PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+# rx sample clock 25 ppm slower than tx, --pad_samples adjusted for a shift delta forwards
+add_test(NAME v2_rx2_samclk_slow
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
+                       ./test/v2_spot.sh --sample_clock_offset 7999.8 --write_Ry_smooth Ry_smooth.c64 --write_delta_hat delta_hat.f32 --pad_samples 120")
+         set_tests_properties(v2_rx2_samclk_slow PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+# rx sample clock 25 ppm faster than tx, --pad_samples adjusted for a shift delta backwards
+add_test(NAME v2_rx2_samclk_fast
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
+                       ./test/v2_spot.sh --sample_clock_offset 8000.2 --write_Ry_smooth Ry_smooth.c64 --write_delta_hat delta_hat.f32 --pad_samples 35")
+         set_tests_properties(v2_rx2_samclk_fast PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
 # spot checks with AGC
 
 add_test(NAME v2_rx2_agc_mpp_high

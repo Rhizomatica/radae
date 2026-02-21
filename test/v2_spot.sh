@@ -34,6 +34,7 @@ a_sine_amp=""
 sine_freq=""
 a_sine_freq=""
 prepend_signal2=0
+sample_clock_offset=0
 POSITIONAL=()
 while [[ $# -gt 0 ]]
 do
@@ -75,6 +76,12 @@ case $key in
         prepend_signal2=1	
         shift
     ;;
+    --sample_clock_offset)
+        sample_clock_offset=1	
+        a_rx_Fs="$2"
+        shift
+        shift
+    ;;
     *)
     POSITIONAL+=("$1") # save it in an array for later
     shift
@@ -96,6 +103,13 @@ if [ "$prepend_signal2" -eq 1 ]; then
     $g_file $a_g_file $EbNodB $a_EbNodB_value $sine_amp $a_sine_amp $sine_freq $a_sine_freq
     tmp=$(mktemp)
     cat brian_rx.f32 250725_rx.f32 > $tmp
+    cp $tmp 250725_rx.f32
+fi
+
+# optional sample clock offset, rx clock faster than tx clock
+if [ "$sample_clock_offset" -eq 1 ]; then
+    tmp=$(mktemp)
+    cat 250725_rx.f32 | python3 f32toint16.py --scale 8192 | sox -t .s16 -r 8000 -c 2 - -t .s16 -r $a_rx_Fs -c 2 - | python3 int16tof32.py --scale 1.22E-4 > $tmp
     cp $tmp 250725_rx.f32
 fi
 
