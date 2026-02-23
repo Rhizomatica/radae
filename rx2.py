@@ -276,6 +276,9 @@ while prx + nin < len(rx):
          freq_offset = -delta_phi*Fs/(2.*np.pi*M)
          count = 0
          count1 = 0
+         i = 0
+         frame_sync_even = 0.
+         frame_sync_odd = 0.
          n_acq += 1
 
    if state == "sync":
@@ -297,8 +300,8 @@ while prx + nin < len(rx):
          count = 0
          count1 = 0
 
-      """
-      # TODO: come back to this corner case later
+
+      # trap consistent gross errors, e.g. signal1 closely followed by signal2
       new_sig_delta_hat = np.abs(delta_hat_g - delta_hat) > Ncp
       new_sig_f_hat = np.abs(freq_offset_g -  freq_offset) > 5.
       if sig_det and (new_sig_delta_hat or new_sig_f_hat):
@@ -311,7 +314,7 @@ while prx + nin < len(rx):
          next_state = "idle"
          count = 0
          count1 = 0
-      """
+   
 
       # adjust timing to point to start of symbol
       delta_hat_rx = int(delta_hat-Ncp)
@@ -387,7 +390,7 @@ while prx + nin < len(rx):
       frame_sync_log[s,1] = frame_sync_odd
 
    if args.verbose or state != prev_state:
-      print(f"{s:4d} {i:4d} state: {state:5s} sig: {sig_det:1d} sine: {sine_det:1d} c: {count:2d} nsd: {new_sig_delta_hat:1d} nsf: {new_sig_f_hat:1d} c1: {count1:2d} ", end='', file=sys.stderr)
+      print(f"{s:4d} {i:4d} {state:5s} nin: {nin:3d} sig: {sig_det:1d} sine: {sine_det:1d} c: {count:2d} nsd: {new_sig_delta_hat:1d} nsf: {new_sig_f_hat:1d} c1: {count1:2d} ", end='', file=sys.stderr)
       print(f"fs: {frame_sync_odd > frame_sync_even:d} ", end='', file=sys.stderr)
       print(f"delta_hat: {delta_hat:3.0f} delta_hat_g: {delta_hat_g:3.0f} ", end='',file=sys.stderr)
       print(f"f_off: {freq_offset:5.2f} f_off_g: {freq_offset_g:5.2f} Ry_max: {Ry_max:5.2f} Ry_min: {Ry_min:5.2f}", file=sys.stderr)

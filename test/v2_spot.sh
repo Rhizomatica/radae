@@ -35,6 +35,8 @@ sine_freq=""
 a_sine_freq=""
 prepend_signal2=0
 sample_clock_offset=0
+df_dt=""
+a_df_dt=""
 POSITIONAL=()
 while [[ $# -gt 0 ]]
 do
@@ -82,6 +84,12 @@ case $key in
         shift
         shift
     ;;
+    --df_dt)
+        df_dt="--df_dt"
+        a_df_dt="$2"
+        shift
+        shift
+    ;;
     *)
     POSITIONAL+=("$1") # save it in an array for later
     shift
@@ -90,17 +98,21 @@ esac
 done
 set -- "${POSITIONAL[@]}" # restore positional parameters
 
-./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/all.wav /dev/null --rate_Fs --latent-dim 56 \
---peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 --write_rx 250725_rx.f32 \
---prepend_noise $a_prepend_noise --append_noise 2 --freq_offset 25 --correct_freq_offset \
-$g_file $a_g_file $EbNodB $a_EbNodB_value $sine_amp $a_sine_amp $sine_freq $a_sine_freq
-
 # optional pre-pending of a 2nd RADE V2 signal to test state machine with two sucessive signals
 if [ "$prepend_signal2" -eq 1 ]; then
     ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/brian_g8sez.wav /dev/null --rate_Fs --latent-dim 56 \
     --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 --write_rx brian_rx.f32 \
     --prepend_noise 1.0 --freq_offset -25 --correct_freq_offset \
     $g_file $a_g_file $EbNodB $a_EbNodB_value $sine_amp $a_sine_amp $sine_freq $a_sine_freq
+fi
+
+./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/all.wav /dev/null --rate_Fs --latent-dim 56 \
+--peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 --write_rx 250725_rx.f32 \
+--prepend_noise $a_prepend_noise --append_noise 2 --freq_offset 25 --correct_freq_offset $df_dt $a_df_dt \
+$g_file $a_g_file $EbNodB $a_EbNodB_value $sine_amp $a_sine_amp $sine_freq $a_sine_freq
+
+# we do the pre-pending here so features_out.f32 is from all.wav
+if [ "$prepend_signal2" -eq 1 ]; then
     tmp=$(mktemp)
     cat brian_rx.f32 250725_rx.f32 > $tmp
     cp $tmp 250725_rx.f32

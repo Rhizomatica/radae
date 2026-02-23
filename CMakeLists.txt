@@ -649,7 +649,7 @@ add_test(NAME v2_rx2_awgn_high
          set_tests_properties(v2_rx2_awgn_high PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 add_test(NAME v2_rx2_awgn_low
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
-                       delta=0.03 ./test/v2_spot.sh --EbNodB 1")
+                       delta=0.03 ./test/v2_spot.sh --EbNodB 1 --hangover 100")
          set_tests_properties(v2_rx2_awgn_low PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 add_test(NAME v2_rx2_mpp_high
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
@@ -717,6 +717,19 @@ add_test(NAME v2_rx2_samclk_fast
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
                        ./test/v2_spot.sh --sample_clock_offset 8000.2 --write_Ry_smooth Ry_smooth.c64 --write_delta_hat delta_hat.f32 --pad_samples 35")
          set_tests_properties(v2_rx2_samclk_fast PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+# frequency drift of -5 Hz/minute, 3.5dB SNR MPP channel
+add_test(NAME v2_rx2_freq_drift
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
+                       delta=0.02 ./test/v2_spot.sh --g_file g_mpp.f32 --EbNodB 10 --df_dt -0.1")
+         set_tests_properties(v2_rx2_freq_drift PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+# two RADE V2 signals signal1, signal2 close together, check signal2 acquired OK, timing on signal2
+# contrived to be right on edge of symbol boundary to make a little harder
+add_test(NAME v2_rx2_signal1_signal2
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
+                       ./test/v2_spot.sh --verbose --prepend_signal2 --prepend_noise 0.31 --EbNodB 10")
+         set_tests_properties(v2_rx2_signal1_signal2 PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
 # spot checks with AGC
 
