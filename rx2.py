@@ -300,8 +300,7 @@ while prx + nin < len(rx):
          count = 0
          count1 = 0
 
-
-      # trap consistent gross errors, e.g. signal1 closely followed by signal2
+      # trap consistent gross errors, e.g. signal1 closely followed by signal2, or a false sync corner case
       new_sig_delta_hat = np.abs(delta_hat_g - delta_hat) > Ncp
       new_sig_f_hat = np.abs(freq_offset_g -  freq_offset) > 5.
       if sig_det and (new_sig_delta_hat or new_sig_f_hat):
