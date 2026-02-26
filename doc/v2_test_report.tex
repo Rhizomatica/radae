@@ -43,21 +43,19 @@ pinstyle/.style = {pin edge={to-,thin,black}}
 
 \section{Introduction}
 
-This document describes the tests performed on the prototype RADE V2 waveform, and the test results.
-
-\subsection{Acknowledgements}
+This document describes the tests performed on the prototype RADE V2 waveform, and presents the test results.
 
 The RADE concept evolved from a discussion between Jean-Marc Valin and David Rowe, after which Jean-Marc quickly put together an initial proof-of-concept demo in late 2023. Over 2024 David built on this work to develop a practical over the air waveform for speech over HF radio channels. This waveform is denoted RADE V1. 
-Over the course of 2025 and early 2026 David worked on developing RADEV2, which has several novel innovations:
+Over the course of 2025 and early 2026 David has been developing RADE V2, which has several novel innovations:
 \begin{itemize}
-\item Using ML to handle HF channel phase distortion, fine frequency offsets, and small timing estimates.
-\item No pilot or unique word symbols.
-\item A $N_c=14$ waveform with a 800 \si{Hz} 99\% occupied bandwidth (OBW).
-\item PAPR set by a filter inside the encoder.
-\item Low latency frame of around 40 \si{ms}.
-\item ML based frame sync, rather than pilot symbols or a unique word.
+\item Using ML to handle HF channel phase distortion, fine frequency and timing offsets.
+\item No pilot or unique word symbols, saving bandwidth and power.
+\item A $N_c=14$ carrier waveform with a 800 \si{Hz} 99\% power occupied bandwidth (OBW), that is narrower and cleaner than V1.
+\item PAPR defined by training, making it relatively insensitive to transmitter filtering.
+\item Low latency frame of around 40 \si{ms} compared to 200 \si{ms} for comparable (e.g. RADE V1) waveforms.
+\item ML based frame sync that functions without pilot or unique word symbols.
 \end{itemize}
-Jean-Marc again assisted with suggestion for timing estimation and frequency offset estimation algorithm based on autocorrelation of the received signal.
+Jean-Marc again assisted with suggestions for timing and frequency offset estimation algorithm based on autocorrelation of the received signal.
 
 The FreeDV Project Leadership Team and many others have helped with support and testing. The contributions from David and the FreeDV PLT was generously supported by a grant from Amateur Radio Digital Communications (ARDC).
 
@@ -85,13 +83,20 @@ TODO update this at end of test campaign.
 
 The script \emph{./compare\_models\_inf.sh -p 260203\_inf} was used to generate loss versus SNR/PNR curves (plotted in Figure \ref{fig:260203_inf_loss_SNR3k_models}) for the following conditions:
 \begin{itemize}
-\item RADE V1 Additive White Gaussian Noise (AWGN) and Multipath Poor (MPP) channels.
-\item RADE V2 with no timing estimator, state machine, or frequency offset estimator (Genie V2) using \emph{inference.sh}.
-\item RADE V2 with real world estimators and state machine using \emph{rx2.sh}.
+\item RADE V1.
+\item RADE V2 250725 network with no timing estimator, state machine, or frequency offset estimator (labelled Genie).
+\item RADE V2 250725 network with real world estimators and state machine (labelled rx2).
+\item All waveforms were plotted for Additive White Gaussian Noise (AWGN) and Multipath Poor (MPP) channels.
 \end{itemize}
 
-The RADE V1 simulation is run using the \emph{inference.sh} script with phase equalisation but without timing estimation.  Spot checks of RADE V1 indicate this has no measurable affect on loss versus SNR.  The V2 curves with and without estimators are coincident, showing the estimator algorithms have a small impact on performance.  The high loss on the green V2 curve at less than -1 \si{dB} is a measurement artefact due to the state machine occasionally falling out of sync at low SNRs; decoded audio is still possible as it recovers and re-syncs.
-Looking at the AWGN curves on the loss versus SNR plot, for any SNR above 5 \si{dB}, the loss of V2 is less than V1.
+The RADE V1 simulation is run using the \emph{inference.sh} script with phase equalisation but without timing estimation.  Spot checks of RADE V1 indicate the inclusion of the timing estimator has no measurable affect on loss versus SNR.
+
+The V2 250725 curves with (labelled \emph{rx2}) and without (labelled \emph{Genie}) estimators are coincident, showing the estimator algorithms have a small impact on performance.
+
+The high loss on the green V2 curve at less than -1 \si{dB} is a measurement artefact due to the state machine occasionally falling out of sync at low SNRs; decoded audio is still possible as it recovers and re-syncs.
+
+Examining the AWGN curves on the loss versus SNR plot, for any SNR above 5 \si{dB}, the loss of V2 is less than V1.
+
 The performance target for V2 was 3 \si{dB} over V1. Taking into account the PAPR gains (loss versus PNR curve), gains over V1 of approximately 3 \si{dB} can be observed at low PNRs on the MPP curves.
 
 \begin{figure}[h]
@@ -105,7 +110,7 @@ The performance target for V2 was 3 \si{dB} over V1. Taking into account the PAP
 
 \subsection{MPD Channel}
 
-The target channels for RADE V2 are AWGN and MPP, however we would like RADE V2 to successfully decode speech sent over Multipath Disturbed (MPD) channels, which have a Doppler of 2 \si{Hz} and Delay of 4 \si{ms}. Some additional loss over MPP is acceptable (e.g. equivalent to a few more \si{dB} for maintaining a constant loss), but complete breakdown is not.  The \emph{v2\_spot.sh} tool was used, and the loss from the \emph{rx2.sh} stage reported in Table \ref{tab:loss_by_channel}.  Both the loss and the decoded speech from the MPD channels was quite acceptable, meeting the requirements.
+The target channels for RADE V2 are AWGN and MPP (Doppler 1 \si{Hz}, Delay 2 \si{ms}), however we would like RADE V2 to successfully decode speech sent over Multipath Disturbed (MPD) channels, which have a Doppler of 2 \si{Hz} and Delay of 4 \si{ms}. Some additional loss over MPP is acceptable (e.g. equivalent to a few more \si{dB} for maintaining a constant loss), but complete breakdown is not.  The \emph{v2\_spot.sh} tool was used for this test, and the loss from the \emph{rx2.sh} stage reported in Table \ref{tab:loss_by_channel}.  Both the loss and the decoded speech from the MPD channels was quite acceptable, meeting the requirements.
  
 \begin{table} [h]
 \caption{Loss by channel}
@@ -176,8 +181,8 @@ Several properties of the acquisition subsystem were tested:
 \begin{enumerate}
 \item Acquisition time from when a RADE V2 signal starts to when it is acquired in various channel conditions.
 \item Probability of false acquisition on noise or single carrier sine wave signals when no RADE V2 signal is present.
-\item Ability to acquire if a sine wave signal is present, the lose sync when the V2 signal ceases.
-\item Ability to re-acquire a 2nd RADE V2 signal (with a different frequency offset and timing) just after the first V2 signal ends.
+\item Ability to acquire if a sine wave signal is present, then lose sync when the V2 signal ceases.
+\item Ability to re-acquire a second RADE V2 signal (with a different frequency offset and timing) just after the first V2 signal ends.
 \end{enumerate}
 
 Acquisition time was characterised using \emph{v2\_spot.sh}. Note we prepend 1 second of silence in these tests which is subtracted for the reported \emph{acq\_time} to obtain the results in the Table \ref{tab:time_to_acq}.  Acquisition time becomes longer as SNR drops, which is quite acceptable.  High SNR acquisition time on a good channel of 200 \si{ms} is usable (similar to RADE V1) but a little slow given the decoder latency of 40 \si{ms} so as further work it would be nice to improve this.  This is partially due to state machine design that is optimised for low SNR channels.  It may be possible to modify the state machine to transition quickly if the probability of a valid signal is high, for example sum the probabilities until a threshold is reached rather than using a fixed time (state machine counter) to validate the signal.
@@ -217,7 +222,7 @@ The probability of false acquisition on noise was tested using \emph{v2\_acq.sh}
 
 The probability of false acquisition of noise plus an additive sine wave was tested with \emph{v2\_acq.sh} using the \emph{--sine} option.  This tests the tendency of the receiver to start decoding audio when there is a carrier wave (e.g a station tuning up) and no valid signal.  A 1000 Hz sine wave plus noise resulted in no false acquisitions over a 10 minute run which is a pass.
 
-The ability to acquire with an additive sinewave was tested using \emph{v2\_spot.sh}, with results presented in Table \ref{tab:acq_with_sine}.  In all cases acquisition (sync) is obtained with a sine wave and not held (lost sync) with a sine wave once the V2 signal is removed. A sine wave outside of the V2 signal (e.g. 1000 Hz) has only a small impact on loss.  A sine wave inside the V2 signal (e.g. 1505 Hz) has a larger impact on loss but V2 does not fall over - the desired result.  As the sine wave level increases to near the V2 level (approximately 1.0) it eventually becomes impossible to obtain sync.  A successful sync at a sine wave amplitude of 0.5 indicates additive sine waves at up to -6 \si{dBc} can be tolerated, and acceptable result.
+The ability to acquire with an additive sinewave was tested using \emph{v2\_spot.sh}, with results presented in Table \ref{tab:acq_with_sine}.  In all cases acquisition (sync) is obtained with a sine wave and not held (sync was lost) once the V2 signal is removed. A sine wave outside of the V2 spectrum (e.g. 1000 Hz) has only a small impact on loss.  A sine wave inside the V2 signal (e.g. 1505 Hz) has a larger impact on loss but V2 does not fall over - the desired result.  As the sine wave level increases to near the V2 level (approximately 1.0) it eventually becomes impossible to obtain sync.  A successful sync at a sine wave amplitude of 0.5 indicates additive sine waves at up to -6 \si{dBc} can be tolerated, an acceptable result.
 
 \begin{table} [h]
 \caption{Acquiring and losing sync with additive sine wave}
@@ -245,12 +250,12 @@ The ability to acquire with an additive sinewave was tested using \emph{v2\_spot
 ./test/v2_spot.sh --sine_amp 0.2 --sine_freq 1505 --g_file g_mpp.f32 --verbose
 \end{verbatim}
 
-\noindent Consider the case where signal1 follows signal2, such that there is no gap between them.  This tests stresses the acquisition system, as it is difficult to design for a system that can distinguish signal2 disappearing into a fade for a short duration, from the case where signal1 replaces signal2. The ability quickly to re-acquire a new signal was tested with the following command line:
+\noindent Consider the case where signal1 follows signal2, such that there is no gap between them.  This tests stresses the acquisition system, as it is difficult to design for a system that can distinguish signal2 disappearing into a fade for a short duration, from the case where signal1 replaces signal2. The ability to quickly re-acquire a new signal was tested with the following command line:
 \begin{verbatim}
 ./test/v2_spot.sh --verbose --prepend_signal2 --prepend_noise 0.31 --EbNodB 10
 \end{verbatim}
 
-This generates signal2 (-25 \si{Hz} frequency offset) which is placed just before the target signal1 (25 \si{Hz} frequency offset) with 0 \si{ms} delay.  The test then measures the loss of signal1, a low loss is expected if re-acquisition is successful. The \emph{prepend\_noise} argument was chosen so that the timing offset was just on symbol boundary($\hat{\delta} \approx 160$), a worst case location for the acquisition system. Table \ref{tab:re_acq} presents the results for a few spot tests.  The losses are in all case approximately the same as for signal1 alone which indicated sucessful re-acquisition and a pass.  The lower loss for the MPP result with two signals can be explained by the MPP channel being a little more benign at the end of the longer test period (signal2 10 seconds, signal1 is 56 seconds in length).
+This generates signal2 (-25 \si{Hz} frequency offset) which is placed just before the target signal1 (25 \si{Hz} frequency offset) with 0 \si{ms} delay.  The test then measures the loss of signal1; a low loss is expected if re-acquisition is successful. The \emph{prepend\_noise} argument was chosen so that the timing offset was just on a symbol boundary($\hat{\delta} \approx 160$), a worst case location for the acquisition system. Table \ref{tab:re_acq} presents the results for a few spot tests.  The losses are in all case approximately the same as for signal1 alone which indicated sucessful re-acquisition and a pass.  The counter-intuitive lower loss for the MPP result with two signals can be explained by the MPP channel being a little more benign (on average) over the longer test period (signal2 10 seconds, signal1 is 56 seconds in length).
 
 \begin{table} [h]
 \caption{Re-acquisition test.}
@@ -288,16 +293,23 @@ The AGC curves are coincident with the baseline curve, indicating AGC has a smal
 \end{center}
 \end{figure}
 
-\subsection{Sample clock and freq offset tests}
+\subsection{Sample clock and freq drift tests}
 
-TODO table with parameters of tests and results, command line.
+A Tx/Rx sample clock offset of $\pm 25$ ppm (e.g. $Fs=8000$ \si{Hz} at the Tx and $Fs=8000.2$ \si{Hz} at the Rx) was tested over the 56 second \emph{all.wav} sample. No significant change in loss was observed and the receiver remained in sync.
+
+\begin{verbatim}
+./test/v2_spot.sh --sample_clock_offset 7999.8 --write_Ry_smooth Ry_smooth.c64
+ --write_delta_hat delta_hat.f32 --pad_samples 120
+\end{verbatim}
+
+A Rx frequency offset drifting at -5 \si{Hz} per minute was tested. No significant change in loss was observed and the receiver remained in sync.
+
+\begin{verbatim}
+ delta=0.02 ./test/v2_spot.sh --g_file g_mpp.f32 --EbNodB 10 --df_dt -0.1
+\end{verbatim}
 
 \section{Conclusion}
 
 Present test results against requirements in summary table.
 
-Further work:
-\begin{enumerate}
-\item False acquisition on noise 
-\end{enumerate}
 \end{document}
