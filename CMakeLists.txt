@@ -176,13 +176,13 @@ add_test(NAME chirp_mpp
 # Low SNR ota_test.sh, with chirp measurement, AWGN
 add_test(NAME ota_test_awgn
         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
-                       ./test/ota_test_cal.sh ${CODEC2_DEV_BUILD_DIR} -24 0.4")
+                       ./test/ota_test_cal.sh ${CODEC2_DEV_BUILD_DIR} wav/brian_g8sez.wav -24 0.4")
 
 # Low SNR ota_test.sh, with chirp measurement, MPP, high loss threshold as we only care about gross errors,
 # like stuck in false sync
 add_test(NAME ota_test_mpp
         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
-                       ./test/ota_test_cal.sh ${CODEC2_DEV_BUILD_DIR} -30 0.4 --mpp --freq -25")
+                       ./test/ota_test_cal.sh ${CODEC2_DEV_BUILD_DIR} wav/brian_g8sez.wav -30 0.4 --mpp --freq -25")
 
 
 # Acquisition tests ------------------------------------------------------------------------------------
@@ -728,7 +728,7 @@ add_test(NAME v2_rx2_freq_drift
 # contrived to be right on edge of symbol boundary to make a little harder
 add_test(NAME v2_rx2_signal1_signal2
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
-                       ./test/v2_spot.sh --verbose --prepend_signal2 --prepend_noise 0.31 --EbNodB 10")
+                       ./test/v2_spot.sh --verbose --prepend_signal2 --prepend_noise 0.31 --EbNodB 10 --reset_output_on_resync")
          set_tests_properties(v2_rx2_signal1_signal2 PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
 # spot checks with AGC

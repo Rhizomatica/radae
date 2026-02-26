@@ -86,6 +86,7 @@ parser.add_argument('--quiet', action='store_false', dest='verbose', help='injec
 parser.add_argument('--verbose', action='store_true', dest='verbose', help='inject test delta sequence')
 parser.add_argument('--stop_at', type=int, default=0, help='exit program after this many symbols (default disabled)')
 parser.add_argument('--timing_adj_at', type=int, default=0, help='enable timing adjust after this many symbols (default disabled)')
+parser.add_argument('--reset_output_on_resync', action='store_true', help='only keep output from last resync (default disabled)')
 args = parser.parse_args()
 
 # make sure we don't use a GPU
@@ -126,7 +127,7 @@ agc_target = 1.0*10**(-3/20)
 
 alpha = 0.95
 beta = 0.999
-Tsig = 0.42
+Tsig = 0.38
 Tsin = 4.
 
 # load rx rate_Fs samples
@@ -276,7 +277,8 @@ while prx + nin < len(rx):
          freq_offset = -delta_phi*Fs/(2.*np.pi*M)
          count = 0
          count1 = 0
-         i = 0
+         if args.reset_output_on_resync:
+            i = 0
          frame_sync_even = 0.
          frame_sync_odd = 0.
          n_acq += 1
@@ -314,7 +316,6 @@ while prx + nin < len(rx):
          count = 0
          count1 = 0
    
-
       # adjust timing to point to start of symbol
       delta_hat_rx = int(delta_hat-Ncp)
 

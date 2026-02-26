@@ -5,7 +5,7 @@
 #
 # test usage:
 #
-#   ~/radae main $ ./test/ota_test_cal.sh ~/codec2-dev/build_linux/ -20
+#   ~/radae main $ ./test/ota_test_cal.sh ~/codec2-dev/build_linux/ wav/brian_g8sez.wav -20
 
 if [ $# -lt 2 ]; then
   echo "usage: $0 /path/to/codec2-dev/build No [ch options]"
@@ -13,9 +13,10 @@ if [ $# -lt 2 ]; then
 fi
 
 CODEC2_DEV_BUILD_DIR=$1
-No=$2
-loss_thresh=$3
-shift; shift;
+wav=$2
+No=$3
+loss_thresh=$4
+shift; shift; shift;
 GAIN=0.25 # allow some headroom for noise and fading to prevent clipping
 silence_duration=1
 
@@ -24,7 +25,7 @@ source test/make_g.sh
 cp -f g_mpp.f32 fast_fading_samples.float
 
 printf "\nGenerate tx file and add noise ... \n\n"
-./ota_test.sh -x wav/brian_g8sez.wav --peak
+./ota_test.sh -x $wav --peak
 # add 1 second of silence to start to give est_CNo.py a work out
 dd if=/dev/zero of=/dev/stdout bs=16000 count=${silence_duration} | sox -t .s16 -r 8000 -c 1 - sil.wav
 sox sil.wav tx.wav tx_pad.wav

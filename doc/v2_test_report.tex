@@ -61,9 +61,7 @@ The FreeDV Project Leadership Team and many others have helped with support and 
 
 \section{Feb 2026 Test Results}
 
-\subsection{configuration}
-
-TODO update this at end of test campaign.
+\subsection{Configuration}
 
 \begin{table} [h]
 \caption{Configuration for test campaign.}
@@ -71,8 +69,8 @@ TODO update this at end of test campaign.
 \centering
 \begin{tabular}{ l | l }
  \hline
-  Date  & From 5 Feb 2026 \\
-  Git Hash & bda6f2 \\
+  Date  & From 5-26 Feb 2026 \\
+  Git Hash & 7a558 26 Feb \\
   ML encoder/decoder & 250725 \\
   ML sync & 250725a\_ml\_sync \\
  \hline
@@ -247,12 +245,14 @@ The ability to acquire with an additive sinewave was tested using \emph{v2\_spot
 \noindent Example command lines for acquisition tests with additive sine wave:
 
 \begin{verbatim}
-./test/v2_spot.sh --sine_amp 0.2 --sine_freq 1505 --g_file g_mpp.f32 --verbose
+./test/v2_spot.sh --sine_amp 0.2 --sine_freq 1505 
+--g_file g_mpp.f32 --verbose
 \end{verbatim}
 
 \noindent Consider the case where signal1 follows signal2, such that there is no gap between them.  This tests stresses the acquisition system, as it is difficult to design for a system that can distinguish signal2 disappearing into a fade for a short duration, from the case where signal1 replaces signal2. The ability to quickly re-acquire a new signal was tested with the following command line:
 \begin{verbatim}
-./test/v2_spot.sh --verbose --prepend_signal2 --prepend_noise 0.31 --EbNodB 10
+./test/v2_spot.sh --verbose --prepend_signal2 --prepend_noise 0.31 
+--EbNodB 10 --reset_output_on_resync
 \end{verbatim}
 
 This generates signal2 (-25 \si{Hz} frequency offset) which is placed just before the target signal1 (25 \si{Hz} frequency offset) with 0 \si{ms} delay.  The test then measures the loss of signal1; a low loss is expected if re-acquisition is successful. The \emph{prepend\_noise} argument was chosen so that the timing offset was just on a symbol boundary($\hat{\delta} \approx 160$), a worst case location for the acquisition system. Table \ref{tab:re_acq} presents the results for a few spot tests.  The losses are in all case approximately the same as for signal1 alone which indicated sucessful re-acquisition and a pass.  The counter-intuitive lower loss for the MPP result with two signals can be explained by the MPP channel being a little more benign (on average) over the longer test period (signal2 10 seconds, signal1 is 56 seconds in length).
