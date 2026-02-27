@@ -5,16 +5,16 @@
 pkg load statistics signal;
 
 function do_plots(z_fn='l.f32',rx_fn='', png_fn='', epslatex='',tx_bpf=0)
-    if length(epslatex)
+    if length(epslatex) || length(png_fn)
         [textfontsize linewidth] = set_fonts(20);
     end
     if length(z_fn)
       z=load_f32(z_fn,1);
       s=z(1:2:end)+j*z(2:2:end);
-      figure(2); clf; plot(s,'.'); title('Scatter');
+      figure(2); clf; plot(s,'.');
       mx = max(abs(z))*1.2; axis([-mx mx -mx mx])
       if length(png_fn)
-        print("-dpng",sprintf("%s_scatter.png",png_fn));
+        print("-dpng",sprintf("%s_scatter.png",png_fn),"-S1200,1200");
       end
       if length(epslatex)
         print_eps(sprintf("%s_scatter.eps",epslatex),"-S250,250");
@@ -55,11 +55,14 @@ function do_plots(z_fn='l.f32',rx_fn='', png_fn='', epslatex='',tx_bpf=0)
         % Spectrum plot
         Fs = 8000; y = pwelch(rx,[],[],1024,Fs); y_dB = 10*log10(y);
         mx = max(y_dB); mx = ceil(mx/10)*10;
-        figure(8); clf; 
+        figure(10); clf; 
         plot((0:length(y)-1)*Fs/length(y),y_dB-mx);
         axis([0 3000 -40 0]); grid; xlabel('Freq (Hz)'); ylabel('dB');
+        if length(png_fn)
+          print("-dpng",sprintf("%s_spectrum.png",png_fn),"-S1200,1200");
+        end
         if length(epslatex)
-          print_eps(sprintf("%s_specgram.eps",epslatex),"-S300,300");
+          print_eps(sprintf("%s_spectrum.eps",epslatex),"-S300,300");
         end
 
         peak = max(abs(rx).^2);
@@ -73,7 +76,7 @@ function do_plots(z_fn='l.f32',rx_fn='', png_fn='', epslatex='',tx_bpf=0)
         fcentre = 1475;
         bwHz = bandwidth(rx, fcentre)
 
-        % Spectrum plot
+        % Spectrum plot with 99% OBW
         Fs = 8000; y = pwelch(rx,[],[],1024,Fs); y_dB = 10*log10(y);
         mx = max(y_dB); mx = ceil(mx/10)*10
         figure(8); clf; 
