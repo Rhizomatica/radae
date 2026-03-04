@@ -181,8 +181,8 @@ function process_rx {
     # RADE2 Rx
     cat ${rx_rade2}.raw | python3 int16tof32.py --zeropad > ${rx_rade2}.f32
     ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync ${rx_rade2}.f32 ${filename}_rade2.wav \
-    --latent-dim 56 --w1_dec 128 --gain 1.22E-4 --agc --quiet --correct_time_offset -8 \
-    --write_delta_hat delta_hat.f32 --write_gain gain.f32 --write_freq_offset freq_offset.f32 --write_Ry_smooth Ry_smooth.c64
+    --latent-dim 56 --w1_dec 128 --gain 1.22E-4 --agc --correct_time_offset -8 \
+    --write_delta_hat delta_hat.f32 --write_gain gain.f32 --write_freq_offset freq_offset.f32 --write_Ry_smooth Ry_smooth.c64 2>>${filename}_report.txt
 
     speechfile_no_path_no_ext=$3
     if [ ! ${speechfile_no_path_no_ext} == "" ]; then

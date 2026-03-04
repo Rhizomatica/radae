@@ -38,6 +38,8 @@ sample_clock_offset=0
 df_dt=""
 a_df_dt=""
 ssbfilt=""
+wav="wav/all.wav"
+wav_out="/dev/null"
 POSITIONAL=()
 while [[ $# -gt 0 ]]
 do
@@ -95,7 +97,17 @@ case $key in
         ssb_bpf="--ssb_bpf"
         shift
     ;;
-    *)
+    --wav)
+        wav=$2
+        shift
+        shift
+    ;;
+    --wav_out)
+        wav_out=$2
+        shift
+        shift
+    ;;
+   *)
     POSITIONAL+=("$1") # save it in an array for later
     shift
     ;;
@@ -111,7 +123,7 @@ if [ "$prepend_signal2" -eq 1 ]; then
     $g_file $a_g_file $EbNodB $a_EbNodB_value $sine_amp $a_sine_amp $sine_freq $a_sine_freq $ssb_filt
 fi
 
-./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/all.wav /dev/null --rate_Fs --latent-dim 56 \
+./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth ${wav} /dev/null --rate_Fs --latent-dim 56 \
 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 --write_rx 250725_rx.f32 \
 --prepend_noise $a_prepend_noise --append_noise 2 --freq_offset 25 --correct_freq_offset $df_dt $a_df_dt \
 $g_file $a_g_file $EbNodB $a_EbNodB_value $sine_amp $a_sine_amp $sine_freq $a_sine_freq $ssb_bpf
@@ -136,7 +148,7 @@ fi
 # hold on; plot(state*1.5); hold off; \
 # figure(2); freq_offset=load_f32('freq_offset.f32',1); plot(freq_offset);
 # 2) remove --quiet and look for state transitions (e.g. back to noise), which upsets alignment for loss.py
-./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync 250725_rx.f32 /dev/null --latent-dim 56 \
+./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync 250725_rx.f32 ${wav_out} --latent-dim 56 \
 --w1_dec 128 --correct_time_offset -8 --quiet \
 --write_sig_det sig_det.int16 --write_state state.int16 --write_freq_offset freq_offset.f32 \
 --write_frame_sync frame_sync.f32 $@
