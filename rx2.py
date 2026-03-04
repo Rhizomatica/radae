@@ -87,6 +87,8 @@ parser.add_argument('--verbose', action='store_true', dest='verbose', help='inje
 parser.add_argument('--stop_at', type=int, default=0, help='exit program after this many symbols (default disabled)')
 parser.add_argument('--timing_adj_at', type=int, default=0, help='enable timing adjust after this many symbols (default disabled)')
 parser.add_argument('--reset_output_on_resync', action='store_true', help='only keep output from last resync (default disabled)')
+parser.set_defaults(limit_pitch=True)
+parser.add_argument('--nolimit_pitch', action='store_false', dest='limit_pitch', help='disable limiting (clip) lower end of pitch feature to prevent synthesis pops with some speakers/channels (default enabled)')
 args = parser.parse_args()
 
 # make sure we don't use a GPU
@@ -420,12 +422,17 @@ if len(args.write_frame_sync):
 
 rx = np.concatenate((rx,np.zeros(Ncp+M,dtype=np.complex64)))
 z_hat.shape
-print(f"latent vectors: {z_hat.shape[1]:d}")
+print(f"n_acq: {n_acq:d}",file=sys.stderr)
+print(f"latent vectors: {z_hat.shape[1]:d}",file=sys.stderr)
 
 features_hat = np.zeros(0)
 if z_hat.shape[1]:
    # run RADE decoder
    features_hat = model.core_decoder(z_hat)
+   # limiting the lower end of the pitch feature removed pops 
+   if args.limit_pitch:
+      print(features_hat.shape)
+      features_hat[:,:,18].clamp_(min= -1.4)
    features_hat = torch.cat([features_hat, torch.zeros_like(features_hat)[:,:,:nb_total_features-num_features]], dim=-1)
    #print(features_hat.shape)
    features_hat = features_hat.cpu().detach().numpy().flatten().astype('float32')
@@ -434,4 +441,3 @@ features_hat.tofile(args.features_hat)
 if len(args.write_latent):
    z_hat.cpu().detach().numpy().flatten().astype('float32').tofile(args.write_latent)
 
-print(f"n_acq: {n_acq:d}")

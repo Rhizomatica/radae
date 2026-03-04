@@ -77,7 +77,7 @@ parser.add_argument('--correct_freq_offset', action='store_true', help='correct 
 parser.add_argument('--sine_amp', type=float, default=0.0, help='single freq interferer level (default zero)')
 parser.add_argument('--sine_freq', type=float, default=1000.0, help='single freq interferer freq (default 1000Hz)')
 parser.add_argument('--auxdata', action='store_true', help='inject auxillary data symbol')
-parser.add_argument('--txbpf', action='store_true', help='clipper/BPF styyle compressor')
+parser.add_argument('--txbpf', action='store_true', help='clipper/BPF style compressor')
 parser.add_argument('--ssb_bpf', action='store_true', help=' SSB BPF simulation')
 parser.add_argument('--pilots2', action='store_true', help='insert pilot symbols inside z vectors, replacing data symbols')
 parser.add_argument('--correct_time_offset', type=int, default=0, help='introduces a delay (or advance if -ve) in samples, applied in freq domain (default 0)')

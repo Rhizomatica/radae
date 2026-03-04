@@ -43,10 +43,10 @@ pinstyle/.style = {pin edge={to-,thin,black}}
 
 \section{Introduction}
 
-This document describes the tests performed on the prototype RADE V2 waveform, and presents the test results.
+This document describes the tests performed on the prototype RADE V2 waveform, and presents the test results.  Most of the tests are performed using software simulation, with a subset being performed over real radios and HF radio channels.  At the conclusion of this test campaign the V2 software will be ready for controlled, crowd sourced testing.
 
 The RADE concept evolved from a discussion between Jean-Marc Valin and David Rowe, after which Jean-Marc quickly put together an initial proof-of-concept demo in late 2023. Over 2024 David built on this work to develop a practical over the air waveform for speech over HF radio channels. This waveform is denoted RADE V1. 
-Over the course of 2025 and early 2026 David has been developing RADE V2, which has several novel innovations:
+Over the course of 2025 and early 2026 David has been developing RADE V2, which has several innovations that are novel to both amateur and indeed professional radio communications:
 \begin{itemize}
 \item Using ML to handle HF channel phase distortion, fine frequency and timing offsets.
 \item No pilot or unique word symbols, saving bandwidth and power.
@@ -58,6 +58,31 @@ Over the course of 2025 and early 2026 David has been developing RADE V2, which 
 Jean-Marc again assisted with suggestions for timing and frequency offset estimation algorithm based on autocorrelation of the received signal.
 
 The FreeDV Project Leadership Team and many others have helped with support and testing. The contributions from David and the FreeDV PLT was generously supported by a grant from Amateur Radio Digital Communications (ARDC).
+
+\begin{table} [h]
+\caption{Glossary.}
+\label{tab:glossary}
+\centering
+\begin{tabular}{ p{2.5cm} | p{10cm} }
+ \hline
+  Term & Description \\
+ \hline
+  Acquisition & The process of finding a RADE signal and starting to decode it. \\
+  AGC & Automatic Gain Control. \\
+  AWGN & Additive White Gaussian noise - a channel model without fading. \\
+  loss & A dimensionless measure of distortion in our ML model, based on the distance between the vocoder feature vectors at the encoder and decoder. \\
+  ML & Machine Learning. \\
+  MPD & Multipath disturbed - a channel model for a very poor HF channel with 2 \si{Hz} fading and 4 \si{ms} delay spread. \\
+  MPP & Multipath Poor - a channel model for a poor HF channel with 1 \si{Hz} fading and 2 \si{ms} delay spread. \\
+  OBW & (99\% power) Occupied bandwidth - the bandwidth in \si{Hz} that contains 99\% of the transmitted power. \\
+  Pilot symbols & Symbols inserted into a transmitted signal to aid in synchronisation. This approach was used for RADE V1 but consumes carrier power and RF bandwidth. \\
+  PAPR & Peak to Average Power Ratio, a low PAPR is desirable. \\
+  PNR & Peak power to noise ratio - a useful metric for SSB radio transmitters that are limited by their peak power. \\
+  SNR & RMS signal power to noise ratio, a useful metric for receivers. \\
+  RADE & Radio Autoencoder \\
+ \hline
+\end{tabular}
+\end{table}
 
 \section{Feb 2026 Test Results}
 
@@ -118,8 +143,8 @@ The target channels for RADE V2 are AWGN and MPP (Doppler 1 \si{Hz}, Delay 2 \si
  \hline
  Channel & EbNodB & SNR (\si{dB}) & Loss \\
  \hline
- AWGN & 100 & 100 & 200 \\
- AWGN & 10 & 3.56 & 0.080 \\
+ AWGN & 100 & 100 & 0.080 \\
+ AWGN & 10 & 3.56 & 0.136 \\
  MPP & 100 & 100 &  0.104\\
  MPP & 10 & 3.56 & 0.182 \\
  MPD & 100 & 100 & 0.107 \\
@@ -237,7 +262,7 @@ The ability to acquire with an additive sinewave was tested using \emph{v2\_spot
  MPP  & 1505 & 0.2 & 100 &  93.5 & 0.179 & Y & Y \\
  MPP  & 1505 & 0.2 &   6 & -0.4 & 0.276 & Y & Y \\
  AWGN & 1000 & 0.5 &  10 &  3.6 & 0.147 & Y & Y \\
- AWGN & 1000 & 1.0 &  10 &  3.6 & - & N & N \\
+ AWGN & 1000 & 1.0 &  10 &  3.6 & - & N & - \\
  \hline
 \end{tabular}
 \end{table}
@@ -275,15 +300,17 @@ This generates signal2 (-25 \si{Hz} frequency offset) which is placed just befor
 \end{tabular}
 \end{table}
 
-\subsection{AGC}
+\subsection{Automatic Gain Control (AGC)}
 
-The script \emph{./compare\_models\_inf.sh -p 260206\_inf} was used to generate loss versus SNR curves for 3 AGC conditions (plotted in Figure \ref{fig:260206_inf_loss_SNR3k_models}) on the worst case MPP channel:
+ML networks tend to operate over a limited dynamic range so an AGC is required.  The script \emph{./compare\_models\_inf.sh -p 260206\_inf} was used to generate loss versus SNR curves for 3 AGC conditions (plotted in Figure \ref{fig:260206_inf_loss_SNR3k_models}) on the worst case MPP channel:
 \begin{enumerate}
 \item Baseline with no AGC.
 \item AGC enabled with +20 \si{dB} gain (linear gain of 10).
 \item AGC enabled with -20 \si{dB} gain (linear gain of 0.1).
 \end{enumerate}
-The AGC curves are coincident with the baseline curve, indicating AGC has a small impact on performance. AGC operation is limited to $\pm 20 \si{dB}$ about the RMS level of 1.0, therefore a manual gain may be required, e.g. to scale from a typical $\pm 2^{15}$ peak level common with deployments.
+The AGC curves are coincident with the baseline curve, indicating AGC has a small impact on performance.
+
+AGC operation is limited to $\pm 20$  \si{dB} from the nominal peak level of $A=1.0$ or $0.1<A<10.0$ .  Therefore a manual gain term may be required to scale from a typical $\pm 2^{15}$ peak level common with deployments to the range $0.1<A<10.0$ at input of the V2 receiver.  In terms of RMS levels, given a 3 \si{dB} PAPR, we would like $A_{rms}=0.707$ at the receiver input. 
 
 \begin{figure}[h]
 \caption{Loss versus SNR for various AGC conditions.}
@@ -308,8 +335,50 @@ A Rx frequency offset drifting at -5 \si{Hz} per minute was tested. No significa
  delta=0.02 ./test/v2_spot.sh --g_file g_mpp.f32 --EbNodB 10 --df_dt -0.1
 \end{verbatim}
 
+\subsection{Initial Over the Air Tests}
+
+This section describes initial OTA tests using the stored file test system implemented by the script \emph{ota\_test.sh}. The purpose of these tests is to verify that V2 does indeed work over real world HF Radio channels, and prepare the test software for a wider test campaign.
+
+TODO:
+\begin{enumerate}
+\item Listen to simulated tests with several speakers across "4 channel points" to spot and fix any obvious issues.
+\item Over The Cable (OTC) test to measure loss from passing V2 through real radios with a known benign channel. This can then be used to benchmark the use of other applications (e.g. freedv-gui) and radios.
+\item A limited set of OTA tests by at least two operators in different parts of the world.
+\item Debug test script and fix any V2 bugs revealed.
+\end{enumerate}
+
 \section{Conclusion}
 
-Present test results against requirements in summary table.
+In Table \ref{tab:re_acq} the results from this test campaign are summarised and compared to requirements extracted from FreeDV-038.  Only performance and functional requirements have been extracted (e.g. we don't consider implementation issues like a C port or packaging).
+
+\begin{table} [h]
+\caption{Test results compared to performance requirements}
+\label{tab:re_acq}
+\centering
+\begin{tabular}{ p{5cm} | p{1cm} | p{5cm}  }
+\hline
+Requirement & Met & Comment \\
+\hline
+Speech quality v SNR $\ge$ RADE V1 on AWGN \& MPP. & Pass & $\approx 3$ \si{dB} gain \\
+Handles MPD channel without breaking down & Pass & \\
+PAPR $< 1$ \si{dB}| through a typical SSB band pass filter. & Partial & This requirement was found to be in error, real world PAPR of RADE V1 was $>$ 4 \si{dB}.  We have achieved a PAPR of $\approx 3$ \si{dB} with V2, a 1 \si{dB} gain on V1. \\
+OBW $<$ 2000 \si{Hz} & Pass & V2 OBW measured as $\approx 860$ \si{Hz}, much cleaner spectrum. \\ 
+Frequency Offsets $\pm 50$ \si{Hz} & Partial & Current algorithm natively handles $\pm 32$ \si{Hz}, should be possible to extend this with further work. \\
+Clean end of over detection within 100 ms & Partial & Not met with current state machine, requires the addition of an end of over frame and detection logic. \\
+25 bit/s streaming text for callsign & Partial & Waveform can send 1 bit/frame over channel, but streaming text support not implemented yet. \\
+SNR estimation & Fail & Not implemented yet. Challenging given lack of known symbols. \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Further Work}
+
+Topics for future development. It may be possible to attend to these in parallel with crowd sourced V2 testing, as they have little impact of core requirements such as speech quality and robustness.
+\begin{itemize}
+\item End of Over System.
+\item SNR estimator.
+\item Streaming text.
+\item Extend range of frequency offset estimation.
+\end{itemize}
 
 \end{document}
