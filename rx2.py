@@ -437,17 +437,17 @@ print(f"latent vectors: {z_hat.shape[1]:d}",file=sys.stderr)
 features_hat = np.zeros(0)
 if z_hat.shape[1]:
    # run RADE decoder
-   features_hat = model.core_decoder(z_hat)
-   # limiting the lower end of the pitch feature removed pops 
-   features_hat_statefull = torch.zeros_like(features_hat)
+   features_hat = torch.zeros((1,z_hat.shape[1]*model.dec_stride,num_features))
+
+   features_hat = torch.zeros_like(features_hat)
    for i in range(z_hat.shape[1]):
-      features_hat_statefull[0,model.dec_stride*i:model.dec_stride*(i+1),:] = model.core_decoder_statefull(z_hat[:,i:i+1,:])
-   features_hat = features_hat_statefull
-   features_hat = torch.cat([features_hat, torch.zeros_like(features_hat)[:,:,:nb_total_features-num_features]], dim=-1)
+      features_hat[0,model.dec_stride*i:model.dec_stride*(i+1),:] = model.core_decoder_statefull(z_hat[:,i:i+1,:])
+
+   # limiting the lower end of the pitch feature removed pops 
    if args.limit_pitch:
-      print(features_hat.shape)
       features_hat[:,:,18].clamp_(min= -1.4)
-    #print(features_hat.shape)
+
+   features_hat = torch.cat([features_hat, torch.zeros_like(features_hat)[:,:,:nb_total_features-num_features]], dim=-1)
    features_hat = features_hat.cpu().detach().numpy().flatten().astype('float32')
 features_hat.tofile(args.features_hat)
 
