@@ -94,6 +94,7 @@ class RADAE(nn.Module):
                  w2_enc = 96,
                  w1_dec = 96,
                  w2_dec = 32,
+                 w1_dec_stateful = 96,
                  peak = False,
                  timing_jitter = 0.001
                 ):
@@ -138,7 +139,7 @@ class RADAE(nn.Module):
         self.core_encoder =  nn.DataParallel(radae_base.CoreEncoder(feature_dim, latent_dim, bottleneck=bottleneck, frames_per_step=frames_per_step, w1=w1_enc, w2=w2_enc))
         self.core_decoder =  nn.DataParallel(radae_base.CoreDecoder(latent_dim, feature_dim, frames_per_step=frames_per_step, w1=w1_dec, w2=w2_dec))
         self.core_encoder_statefull =  nn.DataParallel(radae_base.CoreEncoderStatefull(feature_dim, latent_dim, bottleneck=bottleneck, frames_per_step=frames_per_step))
-        self.core_decoder_statefull =  nn.DataParallel(radae_base.CoreDecoderStatefull(latent_dim, feature_dim, frames_per_step=frames_per_step))
+        self.core_decoder_statefull =  nn.DataParallel(radae_base.CoreDecoderStatefull(latent_dim, feature_dim, frames_per_step=frames_per_step, w1=w1_dec_stateful))
         #self.core_encoder = CoreEncoder(feature_dim, latent_dim)
         #self.core_decoder = CoreDecoder(latent_dim, feature_dim)
 
@@ -295,7 +296,7 @@ class RADAE(nn.Module):
 
            
     # Stateful decoder wasn't present during training, so we need to load weights from existing decoder
-    def core_decoder_statefull_load_state_dict(self):
+    def core_decoder_statefull_load_state_dict(self,amodel):
 
         # some of the layer names have been changed due to use of custom GRUStatefull layer
         def key_transformation(old_key):
@@ -310,7 +311,7 @@ class RADAE(nn.Module):
                     return f"module.gru{gru:d}.gru.bias_hh_l0"
             return old_key
 
-        state_dict = self.core_decoder.state_dict()
+        state_dict = amodel.core_decoder.state_dict()
         new_state_dict = OrderedDict()
         for key, value in state_dict.items():
             new_key = key_transformation(key)

@@ -356,7 +356,7 @@ class CoreDecoder(nn.Module):
 # as short as one z vector, and maintains it's own internal state
 class CoreDecoderStatefull(nn.Module):
 
-    def __init__(self, input_dim, output_dim, frames_per_step = 4):
+    def __init__(self, input_dim, output_dim, frames_per_step = 4, w1=96, w2=32):
 
         super(CoreDecoderStatefull, self).__init__()
 
@@ -367,25 +367,26 @@ class CoreDecoderStatefull(nn.Module):
         self.frames_per_step = frames_per_step
 
         # Layers are organized like a DenseNet
-        self.dense_1    = nn.Linear(self.input_size, 96)
-        self.gru1 = GRUStatefull(96, 96, batch_first=True)
-        self.conv1 = Conv1DStatefull(192, 32)
-        self.gru2 = GRUStatefull(224, 96, batch_first=True)
-        self.conv2 = Conv1DStatefull(320, 32)
-        self.gru3 = GRUStatefull(352, 96, batch_first=True)
-        self.conv3 = Conv1DStatefull(448, 32)
-        self.gru4 = GRUStatefull(480, 96, batch_first=True)
-        self.conv4 = Conv1DStatefull(576, 32)
-        self.gru5 = GRUStatefull(608, 96, batch_first=True)
-        self.conv5 = Conv1DStatefull(704, 32)
-        self.output  = nn.Linear(736, self.frames_per_step * self.output_dim)
-        self.glu1 = GLU(96)
-        self.glu2 = GLU(96)
-        self.glu3 = GLU(96)
-        self.glu4 = GLU(96)
-        self.glu5 = GLU(96)
+        self.dense_1 = nn.Linear(self.input_size, w1)
+        self.gru1 = GRUStatefull(w1, w1, batch_first=True)
+        self.conv1 = Conv1DStatefull(2*w1, w2)
+        self.gru2 = GRUStatefull(2*w1+w2, w1, batch_first=True)
+        self.conv2 = Conv1DStatefull(3*w1+w2, w2)
+        self.gru3 = GRUStatefull(3*w1+2*w2, w1, batch_first=True)
+        self.conv3 = Conv1DStatefull(4*w1+2*w2, w2)
+        self.gru4 = GRUStatefull(4*w1+3*w2, w1, batch_first=True)
+        self.conv4 = Conv1DStatefull(5*w1+3*w2, w2)
+        self.gru5 = GRUStatefull(5*w1+4*w2, w1, batch_first=True)
+        self.conv5 = Conv1DStatefull(6*w1+4*w2, w2)
+        self.output  = nn.Linear(6*w1+5*w2, self.frames_per_step * self.output_dim)
+        self.glu1 = GLU(w1)
+        self.glu2 = GLU(w1)
+        self.glu3 = GLU(w1)
+        self.glu4 = GLU(w1)
+        self.glu5 = GLU(w1)
 
         nb_params = sum(p.numel() for p in self.parameters())
+        print(f"decoder stateful: {nb_params:d}",file=sys.stderr)
         # initialize weights
         self.apply(init_weights)
 

@@ -103,12 +103,18 @@ if args.auxdata:
     num_features += 1
 
 # load RADE model
-model = RADAE(num_features, latent_dim, EbNodB=100, Nzmf = 1,
+model_old = RADAE(num_features, latent_dim, EbNodB=100, Nzmf = 1,
               rate_Fs=True, bottleneck=args.bottleneck, cyclic_prefix=args.cp,
               time_offset=args.time_offset, correct_time_offset=args.correct_time_offset,
               stateful_decoder=args.stateful, w1_dec=args.w1_dec)
+model = RADAE(num_features, latent_dim, EbNodB=100, Nzmf = 1,
+              rate_Fs=True, bottleneck=args.bottleneck, cyclic_prefix=args.cp,
+              time_offset=args.time_offset, correct_time_offset=args.correct_time_offset,
+              stateful_decoder=args.stateful, w1_dec=args.w1_dec, w1_dec_stateful=args.w1_dec)
 checkpoint = torch.load(args.model_name, map_location='cpu', weights_only=True)
-model.load_state_dict(checkpoint['state_dict'], strict=False)
+model_old.load_state_dict(checkpoint['state_dict'], strict=False)
+model.core_decoder_statefull_load_state_dict(model_old)
+quit()
 model.eval()
 
 # Load sync model
@@ -430,11 +436,15 @@ if z_hat.shape[1]:
    # run RADE decoder
    features_hat = model.core_decoder(z_hat)
    # limiting the lower end of the pitch feature removed pops 
+   features_hat_statefull = torch.zeros_like(features_hat)
+   for i in range(z_hat.shape[1]):
+      features_hat_statefull[0,model.dec_stride*i:model.dec_stride*(i+1),:] = model.core_decoder_statefull(z_hat[:,i:i+1,:])
+   features_hat = features_hat_statefull
+   features_hat = torch.cat([features_hat, torch.zeros_like(features_hat)[:,:,:nb_total_features-num_features]], dim=-1)
    if args.limit_pitch:
       print(features_hat.shape)
       features_hat[:,:,18].clamp_(min= -1.4)
-   features_hat = torch.cat([features_hat, torch.zeros_like(features_hat)[:,:,:nb_total_features-num_features]], dim=-1)
-   #print(features_hat.shape)
+    #print(features_hat.shape)
    features_hat = features_hat.cpu().detach().numpy().flatten().astype('float32')
 features_hat.tofile(args.features_hat)
 
