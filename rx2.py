@@ -103,18 +103,29 @@ if args.auxdata:
     num_features += 1
 
 # load RADE model
+"""
 model_old = RADAE(num_features, latent_dim, EbNodB=100, Nzmf = 1,
               rate_Fs=True, bottleneck=args.bottleneck, cyclic_prefix=args.cp,
               time_offset=args.time_offset, correct_time_offset=args.correct_time_offset,
               stateful_decoder=args.stateful, w1_dec=args.w1_dec)
+"""
 model = RADAE(num_features, latent_dim, EbNodB=100, Nzmf = 1,
               rate_Fs=True, bottleneck=args.bottleneck, cyclic_prefix=args.cp,
               time_offset=args.time_offset, correct_time_offset=args.correct_time_offset,
               stateful_decoder=args.stateful, w1_dec=args.w1_dec, w1_dec_stateful=args.w1_dec)
 checkpoint = torch.load(args.model_name, map_location='cpu', weights_only=True)
-model_old.load_state_dict(checkpoint['state_dict'], strict=False)
-model.core_decoder_statefull_load_state_dict(model_old)
-quit()
+#model_old.load_state_dict(checkpoint['state_dict'], strict=False)
+#model.core_decoder_statefull_load_state_dict(model_old)
+
+# model was trained with core_decoder_stateful with different w1_dec_stateful.  So we remove
+# mismatched size entries from dictionary so we can load model
+state_dict = checkpoint['state_dict']
+model_dict = model.state_dict()
+pretrained_dict = {k: v for k, v in state_dict.items() if k in model_dict and v.shape == model_dict[k].shape}
+model_dict.update(pretrained_dict)
+model.load_state_dict(model_dict, strict=False)
+model.core_decoder_statefull_load_state_dict(model)
+
 model.eval()
 
 # Load sync model
