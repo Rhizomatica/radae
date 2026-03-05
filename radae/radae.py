@@ -296,7 +296,7 @@ class RADAE(nn.Module):
 
            
     # Stateful decoder wasn't present during training, so we need to load weights from existing decoder
-    def core_decoder_statefull_load_state_dict(self,amodel):
+    def core_decoder_statefull_load_state_dict(self):
 
         # some of the layer names have been changed due to use of custom GRUStatefull layer
         def key_transformation(old_key):
@@ -311,7 +311,7 @@ class RADAE(nn.Module):
                     return f"module.gru{gru:d}.gru.bias_hh_l0"
             return old_key
 
-        state_dict = amodel.core_decoder.state_dict()
+        state_dict = self.core_decoder.state_dict()
         new_state_dict = OrderedDict()
         for key, value in state_dict.items():
             new_key = key_transformation(key)
