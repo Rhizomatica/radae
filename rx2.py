@@ -103,16 +103,6 @@ class RADEv2Receiver:
       self.z_hat        = torch.zeros((1, sequence_length, model.latent_dim), dtype=torch.float32)
       self.features_hat = torch.zeros((1, sequence_length * model.dec_stride, num_features))
 
-      # Diagnostic logs (indexed by symbol number)
-      sl = sequence_length
-      self.state_log       = np.zeros(sl, dtype=np.int16)
-      self.frame_sync_log  = np.zeros((sl, 2), dtype=np.float32)
-      self.Ry_norm_log     = np.zeros((sl, self.sym_len), dtype=np.complex64)
-      self.Ry_smooth_log   = np.zeros((sl, self.sym_len), dtype=np.complex64)
-      self.sig_det_log     = np.zeros(sl, dtype=np.int16)
-      self.delta_hat_log   = np.zeros(sl, dtype=np.float32)
-      self.freq_offset_log = np.zeros(sl, dtype=np.float32)
-      self.gain_log        = np.zeros(sl, dtype=np.float32)
 
    # ------------------------------------------------------------------
    # Public interface
@@ -278,20 +268,6 @@ class RADEv2Receiver:
          nin = self.sym_len - shift
       return nin
 
-   def _update_logs(self, sig_det, gain):
-      s = self.s
-      if s >= len(self.state_log):
-         return
-      self.state_log[s]         = 0 if self.state == "idle" else 1
-      self.gain_log[s]          = gain
-      self.Ry_norm_log[s]       = self.Ry_norm
-      self.Ry_smooth_log[s]     = self.Ry_smooth
-      self.sig_det_log[s]       = sig_det
-      self.delta_hat_log[s]     = self.delta_hat
-      self.freq_offset_log[s]   = self.freq_offset
-      self.frame_sync_log[s, 0] = self.frame_sync_even
-      self.frame_sync_log[s, 1] = self.frame_sync_odd
-
    def _print_status(self, sig_det, sine_det, nin):
       print(
          f"{self.s:4d} {self.i:4d} {self.state:5s} nin: {nin:3d} "
@@ -442,6 +418,19 @@ sequence_length = len(rx)//(Ncp+M)
 print(sequence_length)
 
 receiver = RADEv2Receiver(model, frame_sync_nn, sequence_length, num_features, args)
+
+# Diagnostic logs (indexed by symbol number)
+sl = sequence_length
+sym_len = receiver.sym_len
+state_log       = np.zeros(sl, dtype=np.int16)
+frame_sync_log  = np.zeros((sl, 2), dtype=np.float32)
+Ry_norm_log     = np.zeros((sl, sym_len), dtype=np.complex64)
+Ry_smooth_log   = np.zeros((sl, sym_len), dtype=np.complex64)
+sig_det_log     = np.zeros(sl, dtype=np.int16)
+delta_hat_log   = np.zeros(sl, dtype=np.float32)
+freq_offset_log = np.zeros(sl, dtype=np.float32)
+gain_log        = np.zeros(sl, dtype=np.float32)
+
 nin = receiver.sym_len
 prx = 0
 
@@ -453,7 +442,17 @@ while prx + nin < len(rx):
    prev_state = receiver.state
    next_state, az_hat, nin, sig_det, sine_det, gain = receiver._process_symbol(rx[st:en], nin)
 
-   receiver._update_logs(sig_det, gain)
+   s = receiver.s
+   if s < sl:
+      state_log[s]         = 0 if receiver.state == "idle" else 1
+      gain_log[s]          = gain
+      Ry_norm_log[s]       = receiver.Ry_norm
+      Ry_smooth_log[s]     = receiver.Ry_smooth
+      sig_det_log[s]       = sig_det
+      delta_hat_log[s]     = receiver.delta_hat
+      freq_offset_log[s]   = receiver.freq_offset
+      frame_sync_log[s, 0] = receiver.frame_sync_even
+      frame_sync_log[s, 1] = receiver.frame_sync_odd
 
    if receiver.args.verbose or receiver.state != prev_state:
       receiver._print_status(sig_det, sine_det, nin)
@@ -478,19 +477,19 @@ z_hat = receiver.z_hat[:, :receiver.i, :]
 features_hat = receiver.features_hat[:, :receiver.i * receiver.model.dec_stride, :]
 
 if len(args.write_Ry_smooth):
-   receiver.Ry_smooth_log.flatten().tofile(args.write_Ry_smooth)
+   Ry_smooth_log.flatten().tofile(args.write_Ry_smooth)
 if len(args.write_delta_hat):
-   receiver.delta_hat_log.tofile(args.write_delta_hat)
+   delta_hat_log.tofile(args.write_delta_hat)
 if len(args.write_sig_det):
-   receiver.sig_det_log.tofile(args.write_sig_det)
+   sig_det_log.tofile(args.write_sig_det)
 if len(args.write_freq_offset):
-   receiver.freq_offset_log.tofile(args.write_freq_offset)
+   freq_offset_log.tofile(args.write_freq_offset)
 if len(args.write_gain):
-   receiver.gain_log.tofile(args.write_gain)
+   gain_log.tofile(args.write_gain)
 if len(args.write_state):
-   receiver.state_log.tofile(args.write_state)
+   state_log.tofile(args.write_state)
 if len(args.write_frame_sync):
-   receiver.frame_sync_log.flatten().tofile(args.write_frame_sync)
+   frame_sync_log.flatten().tofile(args.write_frame_sync)
 
 rx = np.concatenate((rx,np.zeros(Ncp+M,dtype=np.complex64)))
 z_hat.shape
