@@ -128,27 +128,8 @@ class RADEv2Receiver:
          st, en = prx, prx + nin
          prx   += nin
 
-         gain = self._compute_gain(rx, st, en)
-         self._update_rx_buf(rx, st, en, nin, gain)
-         nin = self.sym_len
-
-         self._compute_autocorr()
-         sig_det, sine_det = self._detect_signal()
-
          prev_state = self.state
-         next_state = self.state
-
-         if self.state == "idle":
-            next_state = self._process_idle(sig_det, sine_det)
-         elif self.state == "sync":
-            next_state, az_hat = self._process_sync(sig_det, sine_det)
-            if az_hat is not None:
-               self.z_hat[0, self.i, :] = az_hat
-               dec_st = self.model.dec_stride * self.i
-               dec_en = self.model.dec_stride * (self.i + 1)
-               self.features_hat[0, dec_st:dec_en, :] = self.model.core_decoder_statefull(self.z_hat[:, self.i:self.i+1, :])
-               self.i += 1
-            nin = self._adjust_timing(nin)
+         next_state, az_hat, nin, sig_det, sine_det, gain = self._process_symbol(rx, st, en, nin)
 
          self._update_logs(sig_det, gain)
 
@@ -156,6 +137,14 @@ class RADEv2Receiver:
             self._print_status(sig_det, sine_det, nin)
 
          self.state = next_state
+
+         if az_hat is not None:
+            self.z_hat[0, self.i, :] = az_hat
+            dec_st = self.model.dec_stride * self.i
+            dec_en = self.model.dec_stride * (self.i + 1)
+            az_hat = torch.reshape(az_hat,(1,1,model.latent_dim))
+            self.features_hat[0, dec_st:dec_en, :] = self.model.core_decoder_statefull(az_hat)
+            self.i += 1
 
          if self.s > self.args.timing_adj_at:
             self.timing_adj = 1
@@ -168,6 +157,26 @@ class RADEv2Receiver:
    # ------------------------------------------------------------------
    # Private helpers
    # ------------------------------------------------------------------
+
+   def _process_symbol(self, rx, st, en, nin):
+      """Run one symbol through gain, buffer, autocorr, detection and state machine.
+      Returns (next_state, az_hat, nin, sig_det, sine_det)."""
+      gain = self._compute_gain(rx, st, en)
+      self._update_rx_buf(rx, st, en, nin, gain)
+      nin = self.sym_len
+
+      self._compute_autocorr()
+      sig_det, sine_det = self._detect_signal()
+
+      next_state = self.state
+      az_hat = None
+      if self.state == "idle":
+         next_state = self._process_idle(sig_det, sine_det)
+      elif self.state == "sync":
+         next_state, az_hat = self._process_sync(sig_det, sine_det)
+         nin = self._adjust_timing(nin)
+
+      return next_state, az_hat, nin, sig_det, sine_det, gain
 
    def _compute_gain(self, rx, st, en):
       if not self.args.agc:
