@@ -118,51 +118,15 @@ class RADEv2Receiver:
    # Public interface
    # ------------------------------------------------------------------
 
-   def run(self, rx):
-      """Process rx sample array. Returns z_hat (1, n_frames, latent_dim)."""
-      nin = self.sym_len
-      prx = 0
-
-      while prx + nin < len(rx):
-         self.s += 1
-         st, en = prx, prx + nin
-         prx   += nin
-
-         prev_state = self.state
-         next_state, az_hat, nin, sig_det, sine_det, gain = self._process_symbol(rx, st, en, nin)
-
-         self._update_logs(sig_det, gain)
-
-         if self.args.verbose or self.state != prev_state:
-            self._print_status(sig_det, sine_det, nin)
-
-         self.state = next_state
-
-         if az_hat is not None:
-            self.z_hat[0, self.i, :] = az_hat
-            dec_st = self.model.dec_stride * self.i
-            dec_en = self.model.dec_stride * (self.i + 1)
-            az_hat = torch.reshape(az_hat,(1,1,model.latent_dim))
-            self.features_hat[0, dec_st:dec_en, :] = self.model.core_decoder_statefull(az_hat)
-            self.i += 1
-
-         if self.s > self.args.timing_adj_at:
-            self.timing_adj = 1
-
-         if self.s == self.args.stop_at:
-            quit()
-
-      return self.z_hat[:, :self.i, :], self.features_hat[:, :self.i * self.model.dec_stride, :]
-
    # ------------------------------------------------------------------
-   # Private helpers
+   # Helpers
    # ------------------------------------------------------------------
 
-   def _process_symbol(self, rx, st, en, nin):
+   def _process_symbol(self, rx_in, nin):
       """Run one symbol through gain, buffer, autocorr, detection and state machine.
       Returns (next_state, az_hat, nin, sig_det, sine_det)."""
-      gain = self._compute_gain(rx, st, en)
-      self._update_rx_buf(rx, st, en, nin, gain)
+      gain = self._compute_gain(rx_in)
+      self._update_rx_buf(rx_in, nin, gain)
       nin = self.sym_len
 
       self._compute_autocorr()
@@ -178,15 +142,15 @@ class RADEv2Receiver:
 
       return next_state, az_hat, nin, sig_det, sine_det, gain
 
-   def _compute_gain(self, rx, st, en):
+   def _compute_gain(self, rx_in):
       if not self.args.agc:
          return 1.0
-      gain = self.agc_target / (np.sqrt(np.mean(np.abs(rx[st:en]) ** 2)) + 1e-6)
+      gain = self.agc_target / (np.sqrt(np.mean(np.abs(rx_in) ** 2)) + 1e-6)
       return float(np.clip(gain, 0.1, 10.0))
 
-   def _update_rx_buf(self, rx, st, en, nin, gain):
+   def _update_rx_buf(self, rx_in, nin, gain):
       self.rx_buf[:3 * self.sym_len - nin] = self.rx_buf[nin:]
-      self.rx_buf[3 * self.sym_len - nin:] = rx[st:en] * gain
+      self.rx_buf[3 * self.sym_len - nin:] = rx_in * gain
 
    def _compute_autocorr(self):
       M, Ncp, sym_len = self.M, self.Ncp, self.sym_len
@@ -478,7 +442,40 @@ sequence_length = len(rx)//(Ncp+M)
 print(sequence_length)
 
 receiver = RADEv2Receiver(model, frame_sync_nn, sequence_length, num_features, args)
-z_hat, features_hat = receiver.run(rx)
+nin = receiver.sym_len
+prx = 0
+
+while prx + nin < len(rx):
+   receiver.s += 1
+   st, en = prx, prx + nin
+   prx   += nin
+
+   prev_state = receiver.state
+   next_state, az_hat, nin, sig_det, sine_det, gain = receiver._process_symbol(rx[st:en], nin)
+
+   receiver._update_logs(sig_det, gain)
+
+   if receiver.args.verbose or receiver.state != prev_state:
+      receiver._print_status(sig_det, sine_det, nin)
+
+   receiver.state = next_state
+
+   if az_hat is not None:
+      receiver.z_hat[0, receiver.i, :] = az_hat
+      dec_st = receiver.model.dec_stride * receiver.i
+      dec_en = receiver.model.dec_stride * (receiver.i + 1)
+      az_hat = torch.reshape(az_hat,(1,1,model.latent_dim))
+      receiver.features_hat[0, dec_st:dec_en, :] = receiver.model.core_decoder_statefull(az_hat)
+      receiver.i += 1
+
+   if receiver.s > receiver.args.timing_adj_at:
+      receiver.timing_adj = 1
+
+   if receiver.s == receiver.args.stop_at:
+      quit()
+
+z_hat = receiver.z_hat[:, :receiver.i, :]
+features_hat = receiver.features_hat[:, :receiver.i * receiver.model.dec_stride, :]
 
 if len(args.write_Ry_smooth):
    receiver.Ry_smooth_log.flatten().tofile(args.write_Ry_smooth)
