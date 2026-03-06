@@ -53,7 +53,7 @@ class RADEv2Receiver:
    TSIG  = 0.38   # signal-detection threshold on |Ry_smooth|
    TSIN  = 4.0    # sine-wave detection ratio threshold
 
-   def __init__(self, model, frame_sync_nn, sequence_length, num_features, args):
+   def __init__(self, model, frame_sync_nn, args):
       self.model          = model
       self.frame_sync_nn  = frame_sync_nn
       self.args           = args
@@ -99,9 +99,6 @@ class RADEv2Receiver:
       self.Ry_norm   = np.zeros(self.sym_len, dtype=np.complex64)
       self.Ry_smooth = np.zeros(self.sym_len, dtype=np.complex64)
 
-      # Output latent vectors and decoded features
-      self.z_hat        = torch.zeros((1, sequence_length, model.latent_dim), dtype=torch.float32)
-      self.features_hat = torch.zeros((1, sequence_length * model.dec_stride, num_features))
 
 
    # ------------------------------------------------------------------
@@ -417,7 +414,9 @@ if args.plots:
 sequence_length = len(rx)//(Ncp+M)
 print(sequence_length)
 
-receiver = RADEv2Receiver(model, frame_sync_nn, sequence_length, num_features, args)
+receiver = RADEv2Receiver(model, frame_sync_nn, args)
+z_hat        = torch.zeros((1, sequence_length, model.latent_dim), dtype=torch.float32)
+features_hat = torch.zeros((1, sequence_length * model.dec_stride, num_features))
 
 # Diagnostic logs (indexed by symbol number)
 sl = sequence_length
@@ -460,11 +459,11 @@ while prx + nin < len(rx):
    receiver.state = next_state
 
    if az_hat is not None:
-      receiver.z_hat[0, receiver.i, :] = az_hat
+      z_hat[0, receiver.i, :] = az_hat
       dec_st = receiver.model.dec_stride * receiver.i
       dec_en = receiver.model.dec_stride * (receiver.i + 1)
       az_hat = torch.reshape(az_hat,(1,1,model.latent_dim))
-      receiver.features_hat[0, dec_st:dec_en, :] = receiver.model.core_decoder_statefull(az_hat)
+      features_hat[0, dec_st:dec_en, :] = receiver.model.core_decoder_statefull(az_hat)
       receiver.i += 1
 
    if receiver.s > receiver.args.timing_adj_at:
@@ -473,8 +472,8 @@ while prx + nin < len(rx):
    if receiver.s == receiver.args.stop_at:
       quit()
 
-z_hat = receiver.z_hat[:, :receiver.i, :]
-features_hat = receiver.features_hat[:, :receiver.i * receiver.model.dec_stride, :]
+z_hat        = z_hat[:, :receiver.i, :]
+features_hat = features_hat[:, :receiver.i * receiver.model.dec_stride, :]
 
 if len(args.write_Ry_smooth):
    Ry_smooth_log.flatten().tofile(args.write_Ry_smooth)
