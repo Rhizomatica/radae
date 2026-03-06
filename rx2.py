@@ -98,6 +98,7 @@ class RADEv2Receiver:
       # Autocorrelation
       self.Ry_norm   = np.zeros(self.sym_len, dtype=np.complex64)
       self.Ry_smooth = np.zeros(self.sym_len, dtype=np.complex64)
+      self.az_hat    = None
 
 
 
@@ -111,7 +112,8 @@ class RADEv2Receiver:
 
    def _process_symbol(self, rx_in, nin):
       """Run one symbol through gain, buffer, autocorr, detection and state machine.
-      Returns (next_state, az_hat, nin, sig_det, sine_det)."""
+      Returns (next_state, features_hat, nin, sig_det, sine_det, gain).
+      features_hat is the decoded output for the winning frame, or None."""
       gain = self._compute_gain(rx_in)
       self._update_rx_buf(rx_in, nin, gain)
       nin = self.sym_len
@@ -120,14 +122,14 @@ class RADEv2Receiver:
       sig_det, sine_det = self._detect_signal()
 
       next_state = self.state
-      az_hat = None
+      features_hat = None
       if self.state == "idle":
          next_state = self._process_idle(sig_det, sine_det)
       elif self.state == "sync":
-         next_state, az_hat = self._process_sync(sig_det, sine_det)
+         next_state, features_hat = self._process_sync(sig_det, sine_det)
          nin = self._adjust_timing(nin)
 
-      return next_state, az_hat, nin, sig_det, sine_det, gain
+      return next_state, features_hat, nin, sig_det, sine_det, gain
 
    def _compute_gain(self, rx_in):
       if not self.args.agc:
@@ -213,9 +215,9 @@ class RADEv2Receiver:
 
       # Extract symbol and update frame sync (even when transitioning to idle)
       az_hat = self._extract_symbol()
-      winning_az_hat = self._update_frame_sync(az_hat)
+      features_hat = self._update_frame_sync(az_hat)
 
-      return next_state, winning_az_hat
+      return next_state, features_hat
 
    def _extract_symbol(self):
       """Frequency-correct and extract one OFDM symbol; return latent z_hat."""
@@ -233,17 +235,19 @@ class RADEv2Receiver:
       return self.model.receiver(self.rx_i, run_decoder=False)
 
    def _update_frame_sync(self, az_hat):
-      """Update odd/even metrics. Returns az_hat if it is the winning frame, else None."""
+      """Update odd/even metrics. Returns decoded features_hat if winning frame, else None."""
       metric = float(self.frame_sync_nn(az_hat)[0, 0, 0])
       gamma  = self.BETA
       if self.s % 2:
          self.frame_sync_odd = gamma * self.frame_sync_odd + (1 - gamma) * metric
          if self.frame_sync_odd > self.frame_sync_even:
-            return az_hat
+            self.az_hat = az_hat
+            return self.model.core_decoder_statefull(torch.reshape(az_hat, (1, 1, self.model.latent_dim)))
       else:
          self.frame_sync_even = gamma * self.frame_sync_even + (1 - gamma) * metric
          if self.frame_sync_even > self.frame_sync_odd:
-            return az_hat
+            self.az_hat = az_hat
+            return self.model.core_decoder_statefull(torch.reshape(az_hat, (1, 1, self.model.latent_dim)))
       return None
 
    def _adjust_timing(self, nin):
@@ -439,7 +443,7 @@ while prx + nin < len(rx):
    prx   += nin
 
    prev_state = receiver.state
-   next_state, az_hat, nin, sig_det, sine_det, gain = receiver._process_symbol(rx[st:en], nin)
+   next_state, features_hat_slice, nin, sig_det, sine_det, gain = receiver._process_symbol(rx[st:en], nin)
 
    s = receiver.s
    if s < sl:
@@ -458,12 +462,11 @@ while prx + nin < len(rx):
 
    receiver.state = next_state
 
-   if az_hat is not None:
-      z_hat[0, receiver.i, :] = az_hat
+   if features_hat_slice is not None:
+      z_hat[0, receiver.i, :] = receiver.az_hat
       dec_st = receiver.model.dec_stride * receiver.i
       dec_en = receiver.model.dec_stride * (receiver.i + 1)
-      az_hat = torch.reshape(az_hat,(1,1,model.latent_dim))
-      features_hat[0, dec_st:dec_en, :] = receiver.model.core_decoder_statefull(az_hat)
+      features_hat[0, dec_st:dec_en, :] = features_hat_slice
       receiver.i += 1
 
    if receiver.s > receiver.args.timing_adj_at:
