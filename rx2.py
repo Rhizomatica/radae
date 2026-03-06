@@ -53,7 +53,7 @@ class RADEv2Receiver:
    TSIG  = 0.38   # signal-detection threshold on |Ry_smooth|
    TSIN  = 4.0    # sine-wave detection ratio threshold
 
-   def __init__(self, model, frame_sync_nn, sequence_length, args):
+   def __init__(self, model, frame_sync_nn, sequence_length, num_features, args):
       self.model          = model
       self.frame_sync_nn  = frame_sync_nn
       self.args           = args
@@ -99,8 +99,9 @@ class RADEv2Receiver:
       self.Ry_norm   = np.zeros(self.sym_len, dtype=np.complex64)
       self.Ry_smooth = np.zeros(self.sym_len, dtype=np.complex64)
 
-      # Output latent vectors
-      self.z_hat = torch.zeros((1, sequence_length, model.latent_dim), dtype=torch.float32)
+      # Output latent vectors and decoded features
+      self.z_hat        = torch.zeros((1, sequence_length, model.latent_dim), dtype=torch.float32)
+      self.features_hat = torch.zeros((1, sequence_length * model.dec_stride, num_features))
 
       # Diagnostic logs (indexed by symbol number)
       sl = sequence_length
@@ -140,7 +141,13 @@ class RADEv2Receiver:
          if self.state == "idle":
             next_state = self._process_idle(sig_det, sine_det)
          elif self.state == "sync":
-            next_state = self._process_sync(sig_det, sine_det)
+            next_state, az_hat = self._process_sync(sig_det, sine_det)
+            if az_hat is not None:
+               self.z_hat[0, self.i, :] = az_hat
+               dec_st = self.model.dec_stride * self.i
+               dec_en = self.model.dec_stride * (self.i + 1)
+               self.features_hat[0, dec_st:dec_en, :] = self.model.core_decoder_statefull(self.z_hat[:, self.i:self.i+1, :])
+               self.i += 1
             nin = self._adjust_timing(nin)
 
          self._update_logs(sig_det, gain)
@@ -156,7 +163,7 @@ class RADEv2Receiver:
          if self.s == self.args.stop_at:
             quit()
 
-      return self.z_hat[:, :self.i, :]
+      return self.z_hat[:, :self.i, :], self.features_hat[:, :self.i * self.model.dec_stride, :]
 
    # ------------------------------------------------------------------
    # Private helpers
@@ -246,9 +253,9 @@ class RADEv2Receiver:
 
       # Extract symbol and update frame sync (even when transitioning to idle)
       az_hat = self._extract_symbol()
-      self._update_frame_sync(az_hat)
+      winning_az_hat = self._update_frame_sync(az_hat)
 
-      return next_state
+      return next_state, winning_az_hat
 
    def _extract_symbol(self):
       """Frequency-correct and extract one OFDM symbol; return latent z_hat."""
@@ -266,19 +273,18 @@ class RADEv2Receiver:
       return self.model.receiver(self.rx_i, run_decoder=False)
 
    def _update_frame_sync(self, az_hat):
-      """Update odd/even metrics and store z_hat for the winning frame alignment."""
+      """Update odd/even metrics. Returns az_hat if it is the winning frame, else None."""
       metric = float(self.frame_sync_nn(az_hat)[0, 0, 0])
       gamma  = self.BETA
       if self.s % 2:
          self.frame_sync_odd = gamma * self.frame_sync_odd + (1 - gamma) * metric
          if self.frame_sync_odd > self.frame_sync_even:
-            self.z_hat[0, self.i, :] = az_hat
-            self.i += 1
+            return az_hat
       else:
          self.frame_sync_even = gamma * self.frame_sync_even + (1 - gamma) * metric
          if self.frame_sync_even > self.frame_sync_odd:
-            self.z_hat[0, self.i, :] = az_hat
-            self.i += 1
+            return az_hat
+      return None
 
    def _adjust_timing(self, nin):
       """Shift delta_hat and Ry_smooth to keep timing away from buffer boundaries."""
@@ -462,8 +468,8 @@ if args.plots:
 sequence_length = len(rx)//(Ncp+M)
 print(sequence_length)
 
-receiver = RADEv2Receiver(model, frame_sync_nn, sequence_length, args)
-z_hat = receiver.run(rx)
+receiver = RADEv2Receiver(model, frame_sync_nn, sequence_length, num_features, args)
+z_hat, features_hat = receiver.run(rx)
 
 if len(args.write_Ry_smooth):
    receiver.Ry_smooth_log.flatten().tofile(args.write_Ry_smooth)
@@ -485,22 +491,15 @@ z_hat.shape
 print(f"n_acq: {receiver.n_acq:d}",file=sys.stderr)
 print(f"latent vectors: {z_hat.shape[1]:d}",file=sys.stderr)
 
-features_hat = np.zeros(0)
+features_hat_out = np.zeros(0)
 if z_hat.shape[1]:
-   # run RADE decoder
-   features_hat = torch.zeros((1,z_hat.shape[1]*model.dec_stride,num_features))
-
-   features_hat = torch.zeros_like(features_hat)
-   for i in range(z_hat.shape[1]):
-      features_hat[0,model.dec_stride*i:model.dec_stride*(i+1),:] = model.core_decoder_statefull(z_hat[:,i:i+1,:])
-
    # limiting the lower end of the pitch feature removed pops
    if args.limit_pitch:
       features_hat[:,:,18].clamp_(min= -1.4)
 
-   features_hat = torch.cat([features_hat, torch.zeros_like(features_hat)[:,:,:nb_total_features-num_features]], dim=-1)
-   features_hat = features_hat.cpu().detach().numpy().flatten().astype('float32')
-features_hat.tofile(args.features_hat)
+   features_hat_out = torch.cat([features_hat, torch.zeros_like(features_hat)[:,:,:nb_total_features-num_features]], dim=-1)
+   features_hat_out = features_hat_out.cpu().detach().numpy().flatten().astype('float32')
+features_hat_out.tofile(args.features_hat)
 
 if len(args.write_latent):
    z_hat.cpu().detach().numpy().flatten().astype('float32').tofile(args.write_latent)
