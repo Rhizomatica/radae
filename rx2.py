@@ -215,7 +215,7 @@ class RADEv2Receiver:
 
       # Extract symbol and update frame sync (even when transitioning to idle)
       az_hat = self._extract_symbol()
-      features_hat = self._update_frame_sync(az_hat)
+      features_hat = self._update_frame_sync(az_hat,sig_det)
 
       return next_state, features_hat
 
@@ -234,7 +234,7 @@ class RADEv2Receiver:
       )
       return self.model.receiver(self.rx_i, run_decoder=False)
 
-   def _update_frame_sync(self, az_hat):
+   def _update_frame_sync(self, az_hat, sig_det):
       """Update odd/even metrics. Returns decoded features_hat if winning frame, else None."""
       metric = float(self.frame_sync_nn(az_hat)[0, 0, 0])
       gamma  = self.BETA
@@ -250,6 +250,8 @@ class RADEv2Receiver:
          features = self.model.core_decoder_statefull(torch.reshape(az_hat, (1, 1, self.model.latent_dim)))
          if self.args.limit_pitch:
             features[:, :, 18].clamp_(min=-1.4)
+         if self.args.mute and (not sig_det or sine_det):
+            features[:, :, 0] = -5.
          return features
       return None
 
@@ -335,6 +337,8 @@ parser.add_argument('--timing_adj_at', type=int, default=0, help='enable timing 
 parser.add_argument('--reset_output_on_resync', action='store_true', help='only keep output from last resync (default disabled)')
 parser.set_defaults(limit_pitch=True)
 parser.add_argument('--nolimit_pitch', action='store_false', dest='limit_pitch', help='disable limiting (clip) lower end of pitch feature to prevent synthesis pops with some speakers/channels (default enabled)')
+parser.set_defaults(mute=True)
+parser.add_argument('--nomute', action='store_false',  dest='mute', help='disable mute when sig lost (default mute enabled)')
 args = parser.parse_args()
 
 # make sure we don't use a GPU
