@@ -668,6 +668,16 @@ add_test(NAME v2_rx2_oppfs
                        delta=0.03 ./test/v2_spot.sh --g_file g_mpp.f32 --EbNodB 6 --prepend_noise 0.98")
          set_tests_properties(v2_rx2_oppfs PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
+# repeat v2_rx2_mpp_low with with pitch limiting ernabled/disabled to test POP detector
+add_test(NAME v2_rx2_mpp_low_pop1
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
+                       delta=0.03 ./test/v2_spot.sh --wav wav/david_vk5dgr.wav --wav_out tmp.wav --g_file g_mpp.f32 --EbNodB 6 --hangover 100")
+         set_tests_properties(v2_rx2_mpp_low_pop1 PROPERTIES FAIL_REGULAR_EXPRESSION "POP")
+add_test(NAME v2_rx2_mpp_low_pop2
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
+                       delta=0.03 ./test/v2_spot.sh --wav wav/david_vk5dgr.wav --wav_out tmp.wav --g_file g_mpp.f32 --EbNodB 6 --hangover 100 --nolimit_pitch")
+         set_tests_properties(v2_rx2_mpp_low_pop2 PROPERTIES PASS_REGULAR_EXPRESSION "POP")
+        
 # tests to exercise limits of timing est to decoder interface (Jan 2026 timing corner case)
 # we allow a little bit of extra loss at limits (delta=0.05), but want to trap a complete breakdown (like frame sync failing)
 
@@ -753,3 +763,4 @@ add_test(NAME v2_rx2_ch
          --latent-dim 56 --w1_dec 128 --agc --quiet --write_gain gain.f32 --gain 1.22E-4; \
          python3 loss.py features_in.f32 features_out.f32 --features_hat2 features_out_rx2.f32 --compare --clip_start 50 --clip_end 50")
          set_tests_properties(v2_rx2_ch PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+

@@ -45,6 +45,7 @@ if [ $output_speech == "-" ]; then
     aplay $tmp -r 16000 -f S16_LE
 elif [ $output_speech != "/dev/null" ]; then
     tmp=$(mktemp)
-    lpcnet_demo -fargan-synthesis ${features_out} ${tmp}
+    # fprint POP to stderr if we get any big pops
+    lpcnet_demo -fargan-synthesis --pop ${features_out} ${tmp}
     sox -t .s16 -r 16000 -c 1 ${tmp} ${output_speech}
 fi
