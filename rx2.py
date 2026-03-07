@@ -238,16 +238,19 @@ class RADEv2Receiver:
       """Update odd/even metrics. Returns decoded features_hat if winning frame, else None."""
       metric = float(self.frame_sync_nn(az_hat)[0, 0, 0])
       gamma  = self.BETA
+      winning = False
       if self.s % 2:
          self.frame_sync_odd = gamma * self.frame_sync_odd + (1 - gamma) * metric
-         if self.frame_sync_odd > self.frame_sync_even:
-            self.az_hat = az_hat
-            return self.model.core_decoder_statefull(torch.reshape(az_hat, (1, 1, self.model.latent_dim)))
+         winning = self.frame_sync_odd > self.frame_sync_even
       else:
          self.frame_sync_even = gamma * self.frame_sync_even + (1 - gamma) * metric
-         if self.frame_sync_even > self.frame_sync_odd:
-            self.az_hat = az_hat
-            return self.model.core_decoder_statefull(torch.reshape(az_hat, (1, 1, self.model.latent_dim)))
+         winning = self.frame_sync_even > self.frame_sync_odd
+      if winning:
+         self.az_hat = az_hat
+         features = self.model.core_decoder_statefull(torch.reshape(az_hat, (1, 1, self.model.latent_dim)))
+         if self.args.limit_pitch:
+            features[:, :, 18].clamp_(min=-1.4)
+         return features
       return None
 
    def _adjust_timing(self, nin):
@@ -500,10 +503,6 @@ print(f"latent vectors: {z_hat.shape[1]:d}",file=sys.stderr)
 
 features_hat_out = np.zeros(0)
 if z_hat.shape[1]:
-   # limiting the lower end of the pitch feature removed pops
-   if args.limit_pitch:
-      features_hat[:,:,18].clamp_(min= -1.4)
-
    features_hat_out = torch.cat([features_hat, torch.zeros_like(features_hat)[:,:,:nb_total_features-num_features]], dim=-1)
    features_hat_out = features_hat_out.cpu().detach().numpy().flatten().astype('float32')
 features_hat_out.tofile(args.features_hat)
