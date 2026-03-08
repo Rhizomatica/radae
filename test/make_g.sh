@@ -7,3 +7,5 @@ fi
 if [ ! -f g_mpd.f32 ]; then
   DISPLAY="" echo "Fs=8000; Rs=50; Nc=20; multipath_samples('mpd', Fs, Rs, Nc, 120, 'h_nc20_mpd.f32','g_mpd.f32'); quit" | octave-cli -qf
 fi
+
+cp g_mpp.f32 fast_fading_samples.float
