@@ -668,14 +668,30 @@ add_test(NAME v2_rx2_oppfs
                        delta=0.03 ./test/v2_spot.sh --g_file g_mpp.f32 --EbNodB 6 --prepend_noise 0.98 --nomute")
          set_tests_properties(v2_rx2_oppfs PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
-# repeat v2_rx2_mpp_low with with pitch limiting ernabled/disabled to test POP detector
+# Pop tests: inject pitch=-3.0 (well below the -1.4 threshold) into features_in before inference.
+# The encoder compresses this to ~-1.7 at the decoder output, which is still below -1.4 and triggers pops.
+# pop1: limit_pitch clamp in rx2.py suppresses pops (FAIL if POP seen)
+# pop2: --nolimit_pitch disables clamp, pops occur (PASS if POP seen)
+# Both tests exercise the full radio chain to test the limit_pitch code path in rx2.py.
 add_test(NAME v2_rx2_mpp_low_pop1
-         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
-                       delta=0.03 ./test/v2_spot.sh --wav wav/david_vk5dgr.wav --wav_out tmp.wav --g_file g_mpp.f32 --EbNodB 6 --hangover 100")
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
+                       ${CMAKE_SOURCE_DIR}/build/src/lpcnet_demo -features wav/david_vk5dgr.wav features_in.f32; \
+                       python3 inject_bad_pitch.py features_in.f32 features_in_bad.f32 -3.0 5; \
+                       python3 inference.py 250725/checkpoints/checkpoint_epoch_200.pth features_in_bad.f32 /dev/null \
+                       --rate_Fs --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 \
+                       --auxdata --w1_dec 128 --EbNodB 100 --write_rx pop_tx.f32; \
+                       ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync pop_tx.f32 tmp.wav \
+                       --latent-dim 56 --w1_dec 128")
          set_tests_properties(v2_rx2_mpp_low_pop1 PROPERTIES FAIL_REGULAR_EXPRESSION "POP")
 add_test(NAME v2_rx2_mpp_low_pop2
-         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
-                       delta=0.03 ./test/v2_spot.sh --wav wav/david_vk5dgr.wav --wav_out tmp.wav --g_file g_mpp.f32 --EbNodB 6 --hangover 100 --nolimit_pitch")
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
+                       ${CMAKE_SOURCE_DIR}/build/src/lpcnet_demo -features wav/david_vk5dgr.wav features_in.f32; \
+                       python3 inject_bad_pitch.py features_in.f32 features_in_bad.f32 -3.0 5; \
+                       python3 inference.py 250725/checkpoints/checkpoint_epoch_200.pth features_in_bad.f32 /dev/null \
+                       --rate_Fs --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 \
+                       --auxdata --w1_dec 128 --EbNodB 100 --write_rx pop_tx.f32; \
+                       ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync pop_tx.f32 tmp.wav \
+                       --latent-dim 56 --w1_dec 128 --nolimit_pitch")
          set_tests_properties(v2_rx2_mpp_low_pop2 PROPERTIES PASS_REGULAR_EXPRESSION "POP")
         
 # tests to exercise limits of timing est to decoder interface (Jan 2026 timing corner case)
