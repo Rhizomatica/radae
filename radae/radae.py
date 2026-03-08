@@ -240,6 +240,17 @@ class RADAE(nn.Module):
             if self.bottleneck == 3:
                 eoo = torch.tanh(torch.abs(eoo)) * torch.exp(1j*torch.angle(eoo))
             self.eoo = eoo
+
+            # V2 EOO frame: two pend_cp symbols (no bottleneck nonlinearity)
+            # Uses a separate gain so V1 pilot_gain is not affected.
+            # pilot_backoff_eoo_v2 is tuned so peak(eoo_v2) <= 1.0
+            pilot_backoff_eoo_v2 = 10**(-8/20)
+            self.pilot_gain_eoo_v2 = pilot_backoff_eoo_v2 * M / (Nc ** 0.5)
+            eoo_v2 = torch.zeros(1, 2*(M+Ncp), dtype=torch.complex64)
+            eoo_v2[0, :M+Ncp] = self.pend_cp
+            eoo_v2[0, M+Ncp:] = self.pend_cp
+            eoo_v2 *= self.pilot_gain_eoo_v2
+            self.eoo_v2 = eoo_v2
         
         print(f"d: {self.latent_dim} fs: {frames_per_step:d} Tz: {self.Tz:5.3f} Rs: {Rs:5.2f} Rs': {Rs_dash:5.2f} Ts': {Ts_dash:5.3f} Nsmf: {Nsmf:3d} Ns: {Ns:3d} Nc: {Nc:3d} M: {self.M:d} Ncp: {self.Ncp:d}", file=sys.stderr)
 

@@ -52,6 +52,7 @@ class RADEv2Receiver:
    BETA  = 0.999  # delta_hat / freq_offset IIR filter coefficient
    TSIG  = 0.38   # signal-detection threshold on |Ry_smooth|
    TSIN  = 4.0    # sine-wave detection ratio threshold
+   TEOO  = 0.7    # normalised pend correlation threshold for EOO detection
 
    def __init__(self, model, frame_sync_nn, args):
       self.model          = model
@@ -99,6 +100,10 @@ class RADEv2Receiver:
       self.Ry_norm   = np.zeros(self.sym_len, dtype=np.complex64)
       self.Ry_smooth = np.zeros(self.sym_len, dtype=np.complex64)
       self.az_hat    = None
+
+      # EOO detection: freq-corrected M-sample time domain symbol
+      self.rx_sym_td  = np.zeros(self.M, dtype=np.complex64)
+      self.eoo_count  = 0   # consecutive pend correlation hits
 
 
 
@@ -215,6 +220,18 @@ class RADEv2Receiver:
 
       # Extract symbol and update frame sync (even when transitioning to idle)
       az_hat = self._extract_symbol()
+
+      # Check for end of over
+      if self._detect_eoo():
+         if self.args.verbose:
+            print("EOO detected", file=sys.stderr)
+         self.count     = 0
+         self.count1    = 0
+         self.eoo_count = 0
+         # reset smooothed autocorrelation to prevent instant re-sync
+         self.Ry_smooth = 0
+         return "idle", None
+
       features_hat = self._update_frame_sync(az_hat,sig_det)
 
       return next_state, features_hat
@@ -232,7 +249,20 @@ class RADEv2Receiver:
       self.rx_i[self.sym_len:] = torch.tensor(
          self.rx_phase_vec * self.rx_buf[st:en], dtype=torch.complex64
       )
+      self.rx_sym_td = (self.rx_phase_vec * self.rx_buf[st:en])[self.Ncp:]
       return self.model.receiver(self.rx_i, run_decoder=False)
+
+   def _detect_eoo(self):
+      """Detect end of over: require 2 consecutive symbols correlating against pend."""
+      pend = self.model.pend.numpy()
+      corr = np.abs(np.dot(np.conj(self.rx_sym_td), pend))
+      norm = np.sqrt(np.dot(self.rx_sym_td, np.conj(self.rx_sym_td)).real *
+                     np.dot(pend, np.conj(pend)).real)
+      if corr / (norm + 1e-12) > self.TEOO:
+         self.eoo_count += 1
+      else:
+         self.eoo_count = 0
+      return self.eoo_count >= 2
 
    def _update_frame_sync(self, az_hat, sig_det):
       """Update odd/even metrics. Returns decoded features_hat if winning frame, else None."""

@@ -73,6 +73,7 @@ parser.add_argument('--loss_test', type=float, default=0.0, help='compare loss t
 parser.add_argument('--prepend_noise', type=float, default=0.0, help='insert time (sec) of just rate Fs channel noise (no RADAE signal) at start (default 0)')
 parser.add_argument('--append_noise', type=float, default=0.0, help='insert time (sec) of just rate Fs channel noise (no RADAE signal) at end (default 0)')
 parser.add_argument('--end_of_over', action='store_true', help='insert end of over pilot sequence on last two modem frames (default off)')
+parser.add_argument('--end_of_over_v2', action='store_true', help='insert V2 end of over sequence (two pend symbols) at end of transmission (default off)')
 parser.add_argument('--correct_freq_offset', action='store_true', help='correct --freq_offset before decoding here (default off)')
 parser.add_argument('--sine_amp', type=float, default=0.0, help='single freq interferer level (default zero)')
 parser.add_argument('--sine_freq', type=float, default=1000.0, help='single freq interferer freq (default 1000Hz)')
@@ -279,6 +280,17 @@ if __name__ == '__main__':
             eoo = model.eoo
 
             # this is messy! - continue phase, freq and dF/dt track from inside forward()
+            freq = torch.zeros_like(eoo)
+            freq[:,] = model.freq_offset*torch.ones_like(eoo) + model.df_dt*torch.arange(eoo.shape[1])/model.Fs
+            omega = freq*2*torch.pi/model.Fs
+            lin_phase = torch.cumsum(omega,dim=1)
+            lin_phase = torch.exp(1j*lin_phase)
+            eoo = eoo*lin_phase*model.final_phase
+            eoo = eoo + sigma*torch.randn_like(eoo)
+            rx = torch.concatenate([rx,eoo],dim=1)
+         if args.end_of_over_v2:
+            # appends two pend symbols to signal end of over to the V2 receiver
+            eoo = model.eoo_v2
             freq = torch.zeros_like(eoo)
             freq[:,] = model.freq_offset*torch.ones_like(eoo) + model.df_dt*torch.arange(eoo.shape[1])/model.Fs
             omega = freq*2*torch.pi/model.Fs
