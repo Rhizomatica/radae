@@ -755,8 +755,6 @@ add_test(NAME radae_nopy_rx_slip_plus_drops
                           grep 'state:       sync'")
 
 # Test ability to handle buffer slips due to sample clock offsets, rx ADC clock < tx ADC clock
-# TODO: fix me - loss is higher that Python version so have temporaraly raised --loss_test from 0.2 to 0.25 
-# to let it thru for now, technically a fail for nopy
 add_test(NAME radae_nopy_rx_slip_minus
         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
                        ./inference.sh model19_check3/checkpoints/checkpoint_epoch_100.pth wav/brian_g8sez.wav /dev/null \
@@ -764,7 +762,7 @@ add_test(NAME radae_nopy_rx_slip_minus
                        --rate_Fs --pilots --pilot_eq --eq_ls --cp 0.004 --bottleneck 3 --auxdata --write_rx rx.f32 --correct_freq_offset --prepend_noise 0.11; \
                        cat rx.f32 | python3 f32toint16.py --scale 8192 | sox -t .s16 -r 8000 -c 2 - -t .s16 -r 7995 -c 2 - | python3 int16tof32.py > rx_.f32; \
                        cat rx_.f32 | ${RADAE_NOPY_BUILD_DIR}/src/radae_rx > features_rxs_out.f32; \
-                       python3 loss.py features_in.f32 features_rxs_out.f32 --loss_test 0.25 --acq_time_test 1.0")
+                       python3 loss.py features_in.f32 features_rxs_out.f32 --loss_test 0.2 --acq_time_test 1.0")
                        set_tests_properties(radae_nopy_rx_slip_minus PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
 # Characterise run time using full simplex Tx stack (C core encoder version).  No pass/fail, just for characterisation of run time
