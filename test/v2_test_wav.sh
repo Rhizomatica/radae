@@ -12,10 +12,10 @@ function v2_process_4_points {
     wav=$1
     filename=$(basename -- "${wav}")
     filename="${filename%.*}"
-    ./test/v2_spot.sh --wav ${wav} --wav_out ${wav_out_path}/${filename}_awgn_high.wav
-    ./test/v2_spot.sh --wav ${wav} --wav_out ${wav_out_path}/${filename}_awgn_low.wav --EbNodB 1 --hangover 100
-    ./test/v2_spot.sh --wav ${wav} --wav_out ${wav_out_path}/${filename}_mpp_high.wav --g_file g_mpp.f32
-    ./test/v2_spot.sh --wav ${wav} --wav_out ${wav_out_path}/${filename}_mpp_low.wav --g_file g_mpp.f32 --EbNodB 6
+    ./test/v2_spot.sh --wav ${wav} --wav_out ${wav_out_path}/${filename}_awgn_high.wav --end_of_over_v2
+    ./test/v2_spot.sh --wav ${wav} --wav_out ${wav_out_path}/${filename}_awgn_low.wav --end_of_over_v2 --EbNodB 1 --hangover 100
+    ./test/v2_spot.sh --wav ${wav} --wav_out ${wav_out_path}/${filename}_mpp_high.wav --end_of_over_v2 --g_file g_mpp.f32
+    ./test/v2_spot.sh --wav ${wav} --wav_out ${wav_out_path}/${filename}_mpp_low.wav --end_of_over_v2 --g_file g_mpp.f32 --EbNodB 6
 }
 
 wav_out_path="v2_wav_out"

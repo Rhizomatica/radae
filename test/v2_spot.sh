@@ -40,6 +40,7 @@ a_df_dt=""
 ssbfilt=""
 wav="wav/all.wav"
 wav_out="/dev/null"
+eoo=""
 POSITIONAL=()
 while [[ $# -gt 0 ]]
 do
@@ -97,6 +98,10 @@ case $key in
         ssb_bpf="--ssb_bpf"
         shift
     ;;
+    --end_of_over_v2)
+        eoo="--end_of_over_v2"
+        shift
+    ;;
     --wav)
         wav=$2
         shift
@@ -125,7 +130,7 @@ fi
 
 ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth ${wav} /dev/null --rate_Fs --latent-dim 56 \
 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 --write_rx 250725_rx.f32 \
---prepend_noise $a_prepend_noise --append_noise 2 --freq_offset 25 --correct_freq_offset $df_dt $a_df_dt \
+--prepend_noise $a_prepend_noise --append_noise 2 --freq_offset 25 --correct_freq_offset $eoo $df_dt $a_df_dt \
 $g_file $a_g_file $EbNodB $a_EbNodB_value $sine_amp $a_sine_amp $sine_freq $a_sine_freq $ssb_bpf
 
 # we do the pre-pending here so features_out.f32 is from all.wav
