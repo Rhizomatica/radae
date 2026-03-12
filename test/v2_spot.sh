@@ -26,6 +26,8 @@ function print_help {
 # strip of args for inference.sh
 g_file=""
 a_g_file=""
+g_offset=""
+a_g_offset="" 
 EbNodB=""
 a_EbNodB_value=""
 a_prepend_noise=1
@@ -102,6 +104,12 @@ case $key in
         eoo="--end_of_over_v2"
         shift
     ;;
+    --g_offset)
+        g_offset="--g_offset"
+        a_g_offset=$2
+        shift
+        shift
+    ;;
     --wav)
         wav=$2
         shift
@@ -131,7 +139,7 @@ fi
 ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth ${wav} /dev/null --rate_Fs --latent-dim 56 \
 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 --write_rx 250725_rx.f32 \
 --prepend_noise $a_prepend_noise --append_noise 2 --freq_offset 25 --correct_freq_offset $eoo $df_dt $a_df_dt \
-$g_file $a_g_file $EbNodB $a_EbNodB_value $sine_amp $a_sine_amp $sine_freq $a_sine_freq $ssb_bpf
+$g_file $a_g_file $EbNodB $a_EbNodB_value $sine_amp $a_sine_amp $sine_freq $a_sine_freq $ssb_bpf $g_offset $a_g_offset
 
 # we do the pre-pending here so features_out.f32 is from all.wav
 if [ "$prepend_signal2" -eq 1 ]; then
