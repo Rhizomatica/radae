@@ -48,11 +48,12 @@ class RADEv2Receiver:
    for timing/frequency estimation and an ML network for frame alignment.
    """
 
-   ALPHA = 0.95   # Ry_smooth IIR filter coefficient
-   BETA  = 0.999  # delta_hat / freq_offset IIR filter coefficient
-   TSIG  = 0.38   # signal-detection threshold on |Ry_smooth|
-   TSIN  = 4.0    # sine-wave detection ratio threshold
-   TEOO  = 0.7    # normalised pend correlation threshold for EOO detection
+   ALPHA     = 0.95   # Ry_smooth IIR filter coefficient
+   BETA      = 0.999  # delta_hat / freq_offset IIR filter coefficient
+   TSIG      = 0.38   # signal-detection threshold on |Ry_smooth|
+   TSIN      = 4.0    # sine-wave detection ratio threshold
+   TEOO      = 0.42   # smoothed pend correlation threshold for EOO detection
+   ALPHA_EOO = 0.70   # IIR filter coefficient for EOO pend correlation smoother
 
    def __init__(self, model, frame_sync_nn, args):
       self.model          = model
@@ -104,6 +105,7 @@ class RADEv2Receiver:
       # EOO detection: freq-corrected M-sample time domain symbol
       self.rx_sym_td  = np.zeros(self.M, dtype=np.complex64)
       self.eoo_count  = 0   # consecutive pend correlation hits
+      self.eoo_smooth = 0.0 # IIR-smoothed pend correlation
 
 
 
@@ -180,6 +182,7 @@ class RADEv2Receiver:
          self.count1          = 0
          self.frame_sync_even = 0.0
          self.frame_sync_odd  = 0.0
+         self.eoo_smooth      = 0.0
          if self.args.reset_output_on_resync:
             self.i = 0
          self.n_acq += 1
@@ -225,10 +228,11 @@ class RADEv2Receiver:
       if self._detect_eoo():
          if self.args.verbose:
             print("EOO detected", file=sys.stderr)
-         self.count     = 0
-         self.count1    = 0
-         self.eoo_count = 0
-         # reset smooothed autocorrelation to prevent instant re-sync
+         self.count      = 0
+         self.count1     = 0
+         self.eoo_count  = 0
+         self.eoo_smooth = 0.0
+         # reset smoothed autocorrelation to prevent instant re-sync
          self.Ry_smooth = 0
          return "idle", None
 
@@ -253,16 +257,16 @@ class RADEv2Receiver:
       return self.model.receiver(self.rx_i, run_decoder=False)
 
    def _detect_eoo(self):
-      """Detect end of over: require 2 consecutive symbols correlating against pend."""
+      """Detect end of over using IIR-smoothed pend correlation."""
       pend = self.model.pend.numpy()
       corr = np.abs(np.dot(np.conj(self.rx_sym_td), pend))
       norm = np.sqrt(np.dot(self.rx_sym_td, np.conj(self.rx_sym_td)).real *
                      np.dot(pend, np.conj(pend)).real)
-      if corr / (norm + 1e-12) > self.TEOO:
-         self.eoo_count += 1
-      else:
-         self.eoo_count = 0
-      return self.eoo_count >= 2
+      norm_corr = corr / (norm + 1e-12)
+      self.eoo_smooth = self.ALPHA_EOO * self.eoo_smooth + (1.0 - self.ALPHA_EOO) * norm_corr
+      if self.args.verbose:
+         print(f"EOO corr: {norm_corr:.3f} smooth: {self.eoo_smooth:.3f}", file=sys.stderr)
+      return self.eoo_smooth > self.TEOO
 
    def _update_frame_sync(self, az_hat, sig_det):
       """Update odd/even metrics. Returns decoded features_hat if winning frame, else None."""

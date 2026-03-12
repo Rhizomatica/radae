@@ -54,6 +54,7 @@ parser.add_argument('--ber_test', action='store_true', help='send random PSK bit
 parser.add_argument('--h_file', type=str, default="", help='path to rate Rs multipath samples, rate Rs time steps by Nc carriers .f32 format')
 parser.add_argument('--h_complex', action='store_true', help='use complex64 format samples in h_file (default mag only float32)')
 parser.add_argument('--g_file', type=str, default="", help='path to rate Fs Doppler spread samples, ...G1G2G1G2... .f32 format')
+parser.add_argument('--g_offset', type=float, default=0.0, help='start this many seconds into the g_file to shift fade position (default 0)')
 parser.add_argument('--rate_Fs', action='store_true', help='rate Fs simulation (default rate Rs)')
 parser.add_argument('--write_rx', type=str, default="", help='path to output file of rate Fs rx samples in ..IQIQ...f32 format')
 parser.add_argument('--rx_gain', type=float, default=1.0, help='gain to apply to --write_rx samples (default 1.0)')
@@ -176,7 +177,8 @@ if args.g_file:
    # the multipath channel over long runs, but in practice this is hard to predict as
    # test sample runs are short  
    mp_gain = np.real(G[:,0,0])
-   G = mp_gain*G[:,1:,:] 
+   g_offset = int(args.g_offset * model.Fs)
+   G = mp_gain*G[:,1+g_offset:,:]
    if G.shape[1] < num_timesteps_at_rate_Fs:
       print("Multipath Doppler spread file too short")
       quit()
