@@ -106,6 +106,7 @@ class RADEv2Receiver:
       self.rx_sym_td  = np.zeros(self.M, dtype=np.complex64)
       self.eoo_count  = 0   # consecutive pend correlation hits
       self.eoo_smooth = 0.0 # IIR-smoothed pend correlation
+      self._eoo_corr  = 0.0 # most recent instantaneous pend correlation
 
 
 
@@ -262,10 +263,8 @@ class RADEv2Receiver:
       corr = np.abs(np.dot(np.conj(self.rx_sym_td), pend))
       norm = np.sqrt(np.dot(self.rx_sym_td, np.conj(self.rx_sym_td)).real *
                      np.dot(pend, np.conj(pend)).real)
-      norm_corr = corr / (norm + 1e-12)
-      self.eoo_smooth = self.ALPHA_EOO * self.eoo_smooth + (1.0 - self.ALPHA_EOO) * norm_corr
-      if self.args.verbose:
-         print(f"EOO corr: {norm_corr:.3f} smooth: {self.eoo_smooth:.3f}", file=sys.stderr)
+      self._eoo_corr = corr / (norm + 1e-12)
+      self.eoo_smooth = self.ALPHA_EOO * self.eoo_smooth + (1.0 - self.ALPHA_EOO) * self._eoo_corr
       return self.eoo_smooth > self.TEOO
 
    def _update_frame_sync(self, az_hat, sig_det):
@@ -317,7 +316,8 @@ class RADEv2Receiver:
          f"fs: {int(self.frame_sync_odd > self.frame_sync_even):d} "
          f"delta_hat: {self.delta_hat:3.0f} delta_hat_g: {self.delta_hat_g:3.0f} "
          f"f_off: {self.freq_offset:5.2f} f_off_g: {self.freq_offset_g:5.2f} "
-         f"Ry_max: {self.Ry_max:5.2f} Ry_min: {self.Ry_min:5.2f}",
+         f"Ry_max: {self.Ry_max:5.2f} Ry_min: {self.Ry_min:5.2f} "
+         f"eoo: {self.eoo_smooth:.3f} corr: {self._eoo_corr:.3f}",
          file=sys.stderr
       )
 
@@ -371,8 +371,8 @@ parser.add_argument('--timing_adj_at', type=int, default=0, help='enable timing 
 parser.add_argument('--reset_output_on_resync', action='store_true', help='only keep output from last resync (default disabled)')
 parser.set_defaults(limit_pitch=True)
 parser.add_argument('--nolimit_pitch', action='store_false', dest='limit_pitch', help='disable limiting (clip) lower end of pitch feature to prevent synthesis pops with some speakers/channels (default enabled)')
-parser.set_defaults(mute=True)
-parser.add_argument('--nomute', action='store_false',  dest='mute', help='disable mute when sig lost (default mute enabled)')
+parser.set_defaults(mute=False)
+parser.add_argument('--mute', action='store_false',  dest='mute', help='enable mute when sig lost (default disabled)')
 args = parser.parse_args()
 
 # make sure we don't use a GPU
