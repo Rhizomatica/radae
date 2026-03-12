@@ -809,3 +809,12 @@ add_test(NAME radae_nopy_eoo_data_mpp
                        cat rx.f32 |  ${RADAE_NOPY_BUILD_DIR}/src/radae_rx > /dev/null; \
                        python3 eoo_ber.py eoo_tx.f32 eoo_rx.f32")
                        set_tests_properties(radae_nopy_eoo_data_mpp PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+# BPF test - only one iteration
+add_test(NAME radae_nopy_bpf_singlepass
+         COMMAND ${RADAE_NOPY_BUILD_DIR}/src/rade_bpf_test 1 8000)
+
+# BPF test - filter in small chunks
+add_test(NAME radae_nopy_bpf_chunks
+         COMMAND ${RADAE_NOPY_BUILD_DIR}/src/rade_bpf_test 10 960)
+
