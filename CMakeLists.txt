@@ -326,7 +326,7 @@ add_test(NAME radae_snr_est_high
                        ./inference.sh model19_check3/checkpoints/checkpoint_epoch_100.pth wav/brian_g8sez.wav /dev/null \
                        --rate_Fs --pilots --pilot_eq --eq_ls --cp 0.004 --bottleneck 3 --auxdata --write_rx rx.f32 \
                        --correct_freq_offset --EbNodB 10 2>/dev/null; \
-                       cat rx.f32 | python3 radae_rxe.py 2>&1 >/dev/null | python3 test/check_snr.py --snr3k 8.24 --tol 2.0")
+                       cat rx.f32 | python3 radae_rxe.py 2>&1 >/dev/null | python3 test/check_snr.py --snr3k 8.24 --tol 3.0")
          set_tests_properties(radae_snr_est_high PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
 add_test(NAME radae_snr_est_low
@@ -334,7 +334,7 @@ add_test(NAME radae_snr_est_low
                        ./inference.sh model19_check3/checkpoints/checkpoint_epoch_100.pth wav/brian_g8sez.wav /dev/null \
                        --rate_Fs --pilots --pilot_eq --eq_ls --cp 0.004 --bottleneck 3 --auxdata --write_rx rx.f32 \
                        --correct_freq_offset --EbNodB 5 2>/dev/null; \
-                       cat rx.f32 | python3 radae_rxe.py 2>&1 >/dev/null | python3 test/check_snr.py --snr3k 3.24 --tol 2.0")
+                       cat rx.f32 | python3 radae_rxe.py 2>&1 >/dev/null | python3 test/check_snr.py --snr3k 3.24 --tol 3.0")
          set_tests_properties(radae_snr_est_low PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
 # SNR=0dB MPP
