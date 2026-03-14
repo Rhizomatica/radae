@@ -17,7 +17,7 @@ args = parser.parse_args()
 
 snr_values = []
 for line in sys.stdin:
-    if 'state: sync' in line:
+    if re.search(r'state:\s+sync', line):
         m = re.search(r'SNRdB:\s*([-0-9.]+)', line)
         if m:
             snr_values.append(float(m.group(1)))

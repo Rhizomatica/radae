@@ -324,21 +324,23 @@ add_test(NAME radae_rx_awgn
                        python3 loss.py features_in.f32 features_rx_out.f32 --loss 0.3 --acq_time_test 1.0 --clip_end 300")
                        set_tests_properties(radae_rx_awgn PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
-# SNR estimator spot tests: check radae_rxe.py reports SNR3k within 3 dB of inference.sh target
+# SNR estimator spot tests: check radae_rxe.py reports SNR3k within 3 dB of inference.sh Measured SNR3k
 add_test(NAME radae_snr_est_high
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
                        ./inference.sh model19_check3/checkpoints/checkpoint_epoch_100.pth wav/brian_g8sez.wav /dev/null \
                        --rate_Fs --pilots --pilot_eq --eq_ls --cp 0.004 --bottleneck 3 --auxdata --write_rx rx.f32 \
-                       --correct_freq_offset --EbNodB 10 2>/dev/null; \
-                       cat rx.f32 | python3 radae_rxe.py 2>&1 >/dev/null | python3 test/check_snr.py --snr3k 8.24 --tol 3.0")
+                       --correct_freq_offset --EbNodB 10 >snr_inf_high.txt 2>/dev/null; \
+                       SNR3K=\$(grep Measured snr_inf_high.txt | awk '{print \$4}'); \
+                       cat rx.f32 | python3 radae_rxe.py 2>&1 >/dev/null | python3 test/check_snr.py --snr3k \$SNR3K --tol 2.0")
          set_tests_properties(radae_snr_est_high PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
 add_test(NAME radae_snr_est_low
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
                        ./inference.sh model19_check3/checkpoints/checkpoint_epoch_100.pth wav/brian_g8sez.wav /dev/null \
                        --rate_Fs --pilots --pilot_eq --eq_ls --cp 0.004 --bottleneck 3 --auxdata --write_rx rx.f32 \
-                       --correct_freq_offset --EbNodB 5 2>/dev/null; \
-                       cat rx.f32 | python3 radae_rxe.py 2>&1 >/dev/null | python3 test/check_snr.py --snr3k 3.24 --tol 3.0")
+                       --correct_freq_offset --EbNodB 5 >snr_inf_low.txt 2>/dev/null; \
+                       SNR3K=\$(grep Measured snr_inf_low.txt | awk '{print \$4}'); \
+                       cat rx.f32 | python3 radae_rxe.py 2>&1 >/dev/null | python3 test/check_snr.py --snr3k \$SNR3K --tol 2.0")
          set_tests_properties(radae_snr_est_low PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
 # SNR=0dB MPP
@@ -823,7 +825,7 @@ add_test(NAME radae_nopy_eoo_data_mpp
                        cat tx_2.f32 | python3 f32toint16.py --real --scale 8192 > tx.raw; \
                        ${CODEC2_DEV_BUILD_DIR}/src/ch tx.raw rx.raw --No -24 --mpp --fading_dir .; \
                        cat rx.raw | python3 int16tof32.py --zeropad > rx.f32; \
-                       cat rx.f32 |  ${RADAE_NOPY_BUILD_DIR}/src/radae_rx > /dev/null; \
+                       cat rx.f32 | ${RADAE_NOPY_BUILD_DIR}/src/radae_rx > /dev/null; \
                        python3 eoo_ber.py eoo_tx.f32 eoo_rx.f32")
                        set_tests_properties(radae_nopy_eoo_data_mpp PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
@@ -835,3 +837,21 @@ add_test(NAME radae_nopy_bpf_singlepass
 add_test(NAME radae_nopy_bpf_chunks
          COMMAND ${RADAE_NOPY_BUILD_DIR}/src/rade_bpf_test 10 960)
 
+# SNR estimator spot tests: check C radae_rx reports SNR3k within 3 dB of inference.sh Measured SNR3k
+add_test(NAME radae_nopy_snr_est_high
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
+                       ./inference.sh model19_check3/checkpoints/checkpoint_epoch_100.pth wav/brian_g8sez.wav /dev/null \
+                       --rate_Fs --pilots --pilot_eq --eq_ls --cp 0.004 --bottleneck 3 --auxdata --write_rx rx.f32 \
+                       --correct_freq_offset --EbNodB 10 >snr_inf_nopy_high.txt 2>/dev/null; \
+                       SNR3K=\$(grep Measured snr_inf_nopy_high.txt | awk '{print \$4}'); \
+                       cat rx.f32 | ${RADAE_NOPY_BUILD_DIR}/src/radae_rx 2>&1 >/dev/null | python3 test/check_snr.py --snr3k \$SNR3K --tol 2.0")
+         set_tests_properties(radae_nopy_snr_est_high PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+add_test(NAME radae_nopy_snr_est_low
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
+                       ./inference.sh model19_check3/checkpoints/checkpoint_epoch_100.pth wav/brian_g8sez.wav /dev/null \
+                       --rate_Fs --pilots --pilot_eq --eq_ls --cp 0.004 --bottleneck 3 --auxdata --write_rx rx.f32 \
+                       --correct_freq_offset --EbNodB 5 >snr_inf_nopy_low.txt 2>/dev/null; \
+                       SNR3K=\$(grep Measured snr_inf_nopy_low.txt | awk '{print \$4}'); \
+                       cat rx.f32 | ${RADAE_NOPY_BUILD_DIR}/src/radae_rx 2>&1 >/dev/null | python3 test/check_snr.py --snr3k \$SNR3K --tol 2.0")
+         set_tests_properties(radae_nopy_snr_est_low PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
