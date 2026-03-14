@@ -108,6 +108,16 @@ class RADEv2Receiver:
       self.eoo_smooth = 0.0 # IIR-smoothed pend correlation
       self._eoo_corr  = 0.0 # most recent instantaneous pend correlation
 
+      # BPF bandwidth (matches the filter applied in main before the receiver)
+      w = model.w.cpu().detach().numpy()
+      self.B_bpf = 1.2 * (w[model.Nc - 1] - w[0]) * self.Fs / (2.0 * np.pi)
+
+      # SNR estimate from CP autocorrelation peak.
+      # CP correlator sees noise in B_bpf, not 3000 Hz, so subtract the offset
+      # to express snr_est_dB as SNR3k (C/No/3000).
+      self.snr_offset_dB = 10.0 * np.log10(3000.0 / self.B_bpf)
+      self.snr_est_dB = 0.0
+
 
 
    # ------------------------------------------------------------------
@@ -167,6 +177,11 @@ class RADEv2Receiver:
       self.Ry_min      = abs_Ry[int(np.argmin(abs_Ry))]
       sig_det  = self.Ry_max > self.TSIG
       sine_det = self.Ry_max / (self.Ry_min + 1e-12) < self.TSIN
+      # SNR estimate: Ry_norm is normalised by (Rx_cp + Rx_m), so
+      # |Ry_smooth| at peak ≈ rho = SNR_bpf/(SNR_bpf+1), giving SNR_bpf = rho/(1-rho).
+      # Subtract snr_offset_dB to convert from SNR_bpf to SNR3k (C/No/3000).
+      rho = np.clip(self.Ry_max, 0.0, 1.0 - 1e-6)
+      self.snr_est_dB = 10.0 * np.log10(rho / (1.0 - rho) + 1e-12) - self.snr_offset_dB
       return sig_det, sine_det
 
    def _process_idle(self, sig_det, sine_det):
@@ -317,6 +332,7 @@ class RADEv2Receiver:
          f"delta_hat: {self.delta_hat:3.0f} delta_hat_g: {self.delta_hat_g:3.0f} "
          f"f_off: {self.freq_offset:5.2f} f_off_g: {self.freq_offset_g:5.2f} "
          f"Ry_max: {self.Ry_max:5.2f} Ry_min: {self.Ry_min:5.2f} "
+         f"snr_est: {self.snr_est_dB:5.1f} dB "
          f"eoo: {self.eoo_smooth:.3f} corr: {self._eoo_corr:.3f}",
          file=sys.stderr
       )
@@ -354,6 +370,7 @@ parser.add_argument('--write_frame_sync', type=str, default="", help='path to fr
 parser.add_argument('--read_delta_hat', type=str, default="", help='path to delta_hat input file dim (seq_len) in .f32 format')
 parser.add_argument('--fix_delta_hat', type=int,  default=0, help='disable timing estimation and used fixed delta_hat (default: use timing estimation)')
 parser.add_argument('--write_gain', type=str, default="", help='path to AGC output file dim (seq_len) .f32 format')
+parser.add_argument('--write_snr_est', type=str, default="", help='path to SNR estimate output file dim (seq_len) .f32 format (dB)')
 parser.set_defaults(bpf=True)
 parser.set_defaults(auxdata=True)
 parser.set_defaults(verbose=True)
@@ -474,6 +491,7 @@ sig_det_log     = np.zeros(sl, dtype=np.int16)
 delta_hat_log   = np.zeros(sl, dtype=np.float32)
 freq_offset_log = np.zeros(sl, dtype=np.float32)
 gain_log        = np.zeros(sl, dtype=np.float32)
+snr_est_dB_log  = np.zeros(sl, dtype=np.float32)
 
 nin = receiver.sym_len
 prx = 0
@@ -490,6 +508,7 @@ while prx + nin < len(rx):
    if s < sl:
       state_log[s]         = 0 if receiver.state == "idle" else 1
       gain_log[s]          = gain
+      snr_est_dB_log[s]    = receiver.snr_est_dB
       Ry_norm_log[s]       = receiver.Ry_norm
       Ry_smooth_log[s]     = receiver.Ry_smooth
       sig_det_log[s]       = sig_det
@@ -529,6 +548,8 @@ if len(args.write_freq_offset):
    freq_offset_log.tofile(args.write_freq_offset)
 if len(args.write_gain):
    gain_log.tofile(args.write_gain)
+if len(args.write_snr_est):
+   snr_est_dB_log.tofile(args.write_snr_est)
 if len(args.write_state):
    state_log.tofile(args.write_state)
 if len(args.write_frame_sync):

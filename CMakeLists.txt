@@ -838,3 +838,32 @@ add_test(NAME v2_eoo_no_false_trigger_mpp
                        grep 'EOO detected' && echo FAIL || echo PASS")
          set_tests_properties(v2_eoo_no_false_trigger_mpp PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
+# SNR estimator tests: compare snr_est_dB from rx2.py to SNR3k on inference.py Measured: line
+add_test(NAME v2_snr_est_high
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
+                       ${CMAKE_SOURCE_DIR}/build/src/lpcnet_demo -features wav/david_vk5dgr.wav snr_feats.f32; \
+                       python3 inference.py 250725/checkpoints/checkpoint_epoch_200.pth snr_feats.f32 /dev/null \
+                       --latent-dim 56 --w1_dec 128 --auxdata --rate_Fs --cp 0.004 \
+                       --time_offset -16 --correct_time_offset -16 --peak \
+                       --EbNodB 12 --write_rx snr_rx_high.f32 --append_noise 1 > snr_inf_high.txt; \
+                       SNR3K=\$(grep Measured snr_inf_high.txt | awk '{print \$4}'); \
+                       python3 rx2.py 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync \
+                       snr_rx_high.f32 /dev/null --latent-dim 56 --w1_dec 128 --quiet \
+                       --write_snr_est snr_est_high.f32; \
+                       python3 check_snr_est.py \$SNR3K snr_est_high.f32 2.0")
+         set_tests_properties(v2_snr_est_high PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+add_test(NAME v2_snr_est_low
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
+                       ${CMAKE_SOURCE_DIR}/build/src/lpcnet_demo -features wav/david_vk5dgr.wav snr_feats.f32; \
+                       python3 inference.py 250725/checkpoints/checkpoint_epoch_200.pth snr_feats.f32 /dev/null \
+                       --latent-dim 56 --w1_dec 128 --auxdata --rate_Fs --cp 0.004 \
+                       --time_offset -16 --correct_time_offset -16 --peak \
+                       --EbNodB 2 --write_rx snr_rx_low.f32 --append_noise 1 > snr_inf_low.txt; \
+                       SNR3K=\$(grep Measured snr_inf_low.txt | awk '{print \$4}'); \
+                       python3 rx2.py 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync \
+                       snr_rx_low.f32 /dev/null --latent-dim 56 --w1_dec 128 --quiet \
+                       --write_snr_est snr_est_low.f32; \
+                       python3 check_snr_est.py \$SNR3K snr_est_low.f32 2.0")
+         set_tests_properties(v2_snr_est_low PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
