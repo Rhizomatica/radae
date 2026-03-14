@@ -855,3 +855,23 @@ add_test(NAME radae_nopy_snr_est_low
                        SNR3K=\$(grep Measured snr_inf_nopy_low.txt | awk '{print \$4}'); \
                        cat rx.f32 | ${RADAE_NOPY_BUILD_DIR}/src/radae_rx 2>&1 >/dev/null | python3 test/check_snr.py --snr3k \$SNR3K --tol 2.0")
          set_tests_properties(radae_nopy_snr_est_low PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+# DIGITAL SYMBOL BER TESTS (C port) ------------------------------------------
+# Substitute random QPSK symbols (+/-1) for encoder output, apply channel model,
+# demodulate, and check BER against theoretical QPSK/MPP curves with 2 dB implementation loss.
+
+# Noiseless: all bits must be correct
+add_test(NAME radae_nopy_ber
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
+                        ${RADAE_NOPY_BUILD_DIR}/src/rade_ber_test --EbNodB 100 --frames 100")
+         set_tests_properties(radae_nopy_ber PROPERTIES PASS_REGULAR_EXPRESSION "BER: 0.0000")
+
+# AWGN: BER must be below theoretical QPSK target (with 2 dB implementation loss allowance)
+add_test(NAME radae_nopy_ber_awgn
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; test/radae_nopy_ber_awgn.sh ${RADAE_NOPY_BUILD_DIR}")
+         set_tests_properties(radae_nopy_ber_awgn PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+# MPP: BER must be below theoretical two-path Rayleigh target (with 2 dB implementation loss allowance)
+add_test(NAME radae_nopy_ber_mpp
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; test/radae_nopy_ber_mpp.sh ${RADAE_NOPY_BUILD_DIR}")
+         set_tests_properties(radae_nopy_ber_mpp PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
