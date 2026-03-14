@@ -324,6 +324,23 @@ add_test(NAME radae_rx_awgn
                        python3 loss.py features_in.f32 features_rx_out.f32 --loss 0.3 --acq_time_test 1.0 --clip_end 300")
                        set_tests_properties(radae_rx_awgn PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
+# SNR estimator spot tests: check radae_rxe.py reports SNR3k within 3 dB of inference.sh target
+add_test(NAME radae_snr_est_high
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
+                       ./inference.sh model19_check3/checkpoints/checkpoint_epoch_100.pth wav/brian_g8sez.wav /dev/null \
+                       --rate_Fs --pilots --pilot_eq --eq_ls --cp 0.004 --bottleneck 3 --auxdata --write_rx rx.f32 \
+                       --correct_freq_offset --EbNodB 10 2>/dev/null; \
+                       cat rx.f32 | python3 radae_rxe.py 2>&1 >/dev/null | python3 test/check_snr.py --snr3k 8.24 --tol 3.0")
+         set_tests_properties(radae_snr_est_high PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+add_test(NAME radae_snr_est_low
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
+                       ./inference.sh model19_check3/checkpoints/checkpoint_epoch_100.pth wav/brian_g8sez.wav /dev/null \
+                       --rate_Fs --pilots --pilot_eq --eq_ls --cp 0.004 --bottleneck 3 --auxdata --write_rx rx.f32 \
+                       --correct_freq_offset --EbNodB 5 2>/dev/null; \
+                       cat rx.f32 | python3 radae_rxe.py 2>&1 >/dev/null | python3 test/check_snr.py --snr3k 3.24 --tol 3.0")
+         set_tests_properties(radae_snr_est_low PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
 # SNR=0dB MPP
 # End of over detection is not always reliable on MPP, so run-on timer terminates over, --clip_end removes garbage at end
 # We don't don't bother checking acquisition time on this channel, as it's a severe case.
