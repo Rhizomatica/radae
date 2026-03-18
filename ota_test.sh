@@ -21,7 +21,7 @@
 #      sudo adduser david dialout
 #      logout/log back in and check "groups" includes dialout
 # 4. Test rigctl (change model number for your radio):
-#      echo "m" | rigctl -m 3061 -r /dev/ttyUSB0
+#      echo "m" | rigctl -m 361 -r /dev/ttyUSB0
 # 5. Using Settings to make sure default sound device is not the radio
 # 6. Adjust HF radio Tx drive so ALC is just being tickled, set desired RF power:
 #      ./ota_test.sh wav/david_vk5dgr.wav -x
@@ -39,7 +39,7 @@
 # 2. Use IC-7200 SSB radio to Tx
 #    ./ota_test.sh wav/david_vk5dgr.wav -d -f 14236
 # 
-# 3. Process file rx.wav received off. First use a wav file editor to trim any silence from start, then: 
+# 3. Process file rx.wav received off air. First use a wav file editor to trim any silence from start, then: 
 #    ./ota_test.sh -r rx.wav
 #    Then listen to rx_ssb.wav and rx_radae.wav
 #
@@ -59,7 +59,7 @@ kiwi_url=""
 port=8074
 freq_kHz="7177"
 Nbursts=5
-model=3061
+model=361
 gain=6
 serialPort="/dev/ttyUSB0"
 rxwavefile=0
@@ -411,7 +411,7 @@ cat ${tx_radae1}.f32 | python3 f32toint16.py --real --scale 16383 > ${tx_radae1}
 
 # create modulated radae V2 signal
 echo "Creating RADE V2"
-./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth $speechfile_pad /dev/null --rate_Fs --latent-dim 56 --peak --ssb_bpf \
+./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth $speechfile_pad /dev/null --rate_Fs --latent-dim 56 --peak --ssb_bpf --end_of_over_v2 \
 --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 --write_rx ${tx_radae2}.f32
 # save features in/out for later "loss.py" measurments
 cp features_out.f32 ${speechfile_no_path_no_ext}_features_out_tx2.f32
