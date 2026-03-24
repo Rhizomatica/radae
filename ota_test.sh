@@ -178,7 +178,7 @@ function process_rx {
     sox $rx ${filename}_ssb.wav trim 5 $x
     sox $rx -t .s16 ${rx_rade1}.raw trim $start_rade1 $len_rade
     sox -t .s16 -r 8000 -c 1 ${rx_rade1}.raw rade1_in.wav # wave version for debugging
-    sox $rx -t .s16 ${rx_rade2}.raw trim $start_rade2 $len_rade
+    sox $rx -t .s16 ${rx_rade2}.raw trim $start_rade2
     sox -t .s16 -r 8000 -c 1 ${rx_rade2}.raw rade2_in.wav # wave version for debugging
 
     # Use streaming RADE1 Rx
@@ -203,8 +203,8 @@ function process_rx {
       speechfile_no_path_no_ext="${loss_input_wav_file##*/}" # Removes path
       speechfile_no_path_no_ext="${speechfile_no_path_no_ext%.*}" # Removes extension
       # optional loss measurements
-      python3 loss.py ${speechfile_no_path_no_ext}_features_in.f32 ${speechfile_no_path_no_ext}_features_out_tx1.f32 --features_hat2 features_out_rx1.f32 --compare --clip_start 25 | sed -n '5p'
-      python3 loss.py ${speechfile_no_path_no_ext}_features_in.f32 ${speechfile_no_path_no_ext}_features_out_tx2.f32 --features_hat2 features_out_rx2.f32 --compare --clip_start 25 | sed -n '5p'
+      python3 loss.py ${speechfile_no_path_no_ext}_features_in.f32 ${speechfile_no_path_no_ext}_features_out_tx1.f32 --features_hat2 features_out_rx1.f32 --compare --clip_start 25 | sed -n '5p' | tee -a ${filename}_report.txt
+      python3 loss.py ${speechfile_no_path_no_ext}_features_in.f32 ${speechfile_no_path_no_ext}_features_out_tx2.f32 --features_hat2 features_out_rx2.f32 --compare --clip_start 25 | sed -n '5p' | tee -a ${filename}_report.txt
     fi
 }
 
