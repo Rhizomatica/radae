@@ -423,12 +423,14 @@ cat ${tx_radae2}.f32 | python3 f32toint16.py --real --scale 16383 > ${tx_radae2}
 
 # Make power of both signals the same, by adjusting the levels to meet the setpoint
 if [ $peak -eq 1 ]; then
+  measure_peak $tx_ssb
   set_peak $tx_ssb $setpoint_peak
   set_peak ${tx_radae1}.raw $setpoint_peak
   set_peak ${tx_radae2}.raw $setpoint_peak
 else
   set_rms $tx_ssb $setpoint_rms
-  set_rms ${tx_radae}.raw $setpoint_rms
+  set_rms ${tx_radae1}.raw $setpoint_rms
+  set_rms ${tx_radae2}.raw $setpoint_rms
 fi
 
 # insert 1 second of silence between signals
