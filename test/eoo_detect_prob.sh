@@ -11,12 +11,13 @@ EbNodB=100
 channel=awgn
 N=20
 seg_len=2   # seconds per trial
+verbose=0
 
 function print_help {
     echo
     echo "Measure RADE V2 EOO detection probability"
     echo
-    echo "  usage: ./test/eoo_detect_prob.sh [--EbNodB dB] [--channel awgn|mpp] [--N trials]"
+    echo "  usage: ./test/eoo_detect_prob.sh [--EbNodB dB] [--channel awgn|mpp] [--N trials] [--verbose]"
     echo "  example: ./test/eoo_detect_prob.sh --EbNodB 6 --channel mpp --N 20"
     echo
     exit
@@ -27,6 +28,7 @@ while [[ $# -gt 0 ]]; do
         --EbNodB)  EbNodB=$2;  shift 2 ;;
         --channel) channel=$2; shift 2 ;;
         --N)       N=$2;       shift 2 ;;
+        --verbose) verbose=1;  shift ;;
         -h|--help) print_help ;;
         *) echo "Unknown argument: $1"; print_help ;;
     esac
@@ -68,8 +70,13 @@ for i in $(seq 1 $N); do
         --end_of_over_v2 --write_rx $rx_tmp --append_noise 1 --EbNodB $EbNodB \
         $chan_args $g_offset_args 2>/dev/null
 
-    result=$(./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync $rx_tmp /dev/null \
-        --latent-dim 56 --w1_dec 128 --correct_time_offset -8 2>&1 | grep -c "EOO detected" || true)
+    if [ "$verbose" -eq 1 ]; then
+        result=$(./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync $rx_tmp /dev/null \
+            --latent-dim 56 --w1_dec 128 --correct_time_offset -8 2>&1 | tee /dev/stderr | grep -c "EOO detected" || true)
+    else
+        result=$(./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync $rx_tmp /dev/null \
+            --latent-dim 56 --w1_dec 128 --correct_time_offset -8 2>&1 | grep -c "EOO detected" || true)
+    fi
 
     if [ "$result" -gt 0 ]; then
         detected=$((detected + 1))
