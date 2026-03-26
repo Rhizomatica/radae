@@ -1,0 +1,83 @@
+#!/bin/bash -e
+#
+# Measure probability of correct EOO detection for RADE V2.
+# Steps through all.wav in 2-second segments, running one EOO trial per segment.
+# For MPP, g_offset is stepped across trials to sample different fade positions.
+#
+# Usage:
+#   ./test/eoo_detect_prob.sh [--EbNodB <dB>] [--channel <awgn|mpp>] [--N <trials>]
+
+EbNodB=100
+channel=awgn
+N=20
+seg_len=2   # seconds per trial
+
+function print_help {
+    echo
+    echo "Measure RADE V2 EOO detection probability"
+    echo
+    echo "  usage: ./test/eoo_detect_prob.sh [--EbNodB dB] [--channel awgn|mpp] [--N trials]"
+    echo "  example: ./test/eoo_detect_prob.sh --EbNodB 6 --channel mpp --N 20"
+    echo
+    exit
+}
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --EbNodB)  EbNodB=$2;  shift 2 ;;
+        --channel) channel=$2; shift 2 ;;
+        --N)       N=$2;       shift 2 ;;
+        -h|--help) print_help ;;
+        *) echo "Unknown argument: $1"; print_help ;;
+    esac
+done
+
+if [ "$channel" = "mpp" ]; then
+    chan_args="--g_file g_mpp.f32"
+    g_step=10.0
+elif [ "$channel" = "awgn" ]; then
+    chan_args=""
+else
+    echo "Unknown channel: $channel (use awgn or mpp)"
+    exit 1
+fi
+
+wav_dur=$(soxi -D wav/all.wav)
+g_mpp_dur=$(python3 -c "import os; print(os.path.getsize('g_mpp.f32')//(4*2*8000))")
+
+detected=0
+rx_tmp=$(mktemp /tmp/eoo_detect_XXXXXX.f32)
+wav_tmp=$(mktemp /tmp/eoo_seg_XXXXXX.wav)
+trap "rm -f $rx_tmp $wav_tmp" EXIT
+
+echo "EOO detection probability: EbNodB=$EbNodB channel=$channel N=$N seg_len=${seg_len}s"
+
+for i in $(seq 1 $N); do
+    offset=$(python3 -c "print((($i-1)*$seg_len) % int($wav_dur))")
+    sox wav/all.wav $wav_tmp trim $offset $seg_len
+
+    g_offset_args=""
+    g_off=0
+    if [ "$channel" = "mpp" ]; then
+        g_off=$(python3 -c "print((($i-1)*$g_step) % $g_mpp_dur)")
+        g_offset_args="--g_offset $g_off"
+    fi
+
+    ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth $wav_tmp /dev/null --rate_Fs \
+        --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 \
+        --end_of_over_v2 --write_rx $rx_tmp --append_noise 1 --EbNodB $EbNodB \
+        $chan_args $g_offset_args 2>/dev/null
+
+    result=$(./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync $rx_tmp /dev/null \
+        --latent-dim 56 --w1_dec 128 --correct_time_offset -8 2>&1 | grep -c "EOO detected" || true)
+
+    if [ "$result" -gt 0 ]; then
+        detected=$((detected + 1))
+        echo "  trial $i: DETECTED (offset=${offset}s g_offset=$g_off)"
+    else
+        echo "  trial $i: missed   (offset=${offset}s g_offset=$g_off)"
+    fi
+done
+
+prob=$(python3 -c "print(f'{$detected/$N:.2f}')")
+echo "Result: $detected/$N detected, P(detect) = $prob"
