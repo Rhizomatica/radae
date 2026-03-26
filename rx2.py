@@ -52,7 +52,7 @@ class RADEv2Receiver:
    BETA      = 0.999  # delta_hat / freq_offset IIR filter coefficient
    TSIG      = 0.38   # signal-detection threshold on |Ry_smooth|
    TSIN      = 4.0    # sine-wave detection ratio threshold
-   TEOO      = 0.42   # smoothed pend correlation threshold for EOO detection
+   TEOO      = 0.75   # smoothed pend correlation threshold for EOO detection
    ALPHA_EOO = 0.70   # IIR filter coefficient for EOO pend correlation smoother
 
    def __init__(self, model, frame_sync_nn, args):
@@ -273,12 +273,21 @@ class RADEv2Receiver:
       return self.model.receiver(self.rx_i, run_decoder=False)
 
    def _detect_eoo(self):
-      """Detect end of over using IIR-smoothed pend correlation."""
-      pend = self.model.pend.numpy()
-      corr = np.abs(np.dot(np.conj(self.rx_sym_td), pend))
-      norm = np.sqrt(np.dot(self.rx_sym_td, np.conj(self.rx_sym_td)).real *
-                     np.dot(pend, np.conj(pend)).real)
-      self._eoo_corr = corr / (norm + 1e-12)
+      """Detect EOO using channel time-domain sparsity.
+      Estimate H[k] = Rx[k]/Pend[k] at active subcarriers, IFFT to time domain,
+      and measure fraction of energy within the CP window.  A true pend symbol
+      gives H[k] equal to the physical channel (short impulse response, most
+      energy within CP).  A data symbol gives random phases across subcarriers,
+      spreading the IFFT energy uniformly across all M taps."""
+      pend_fd = np.fft.fft(self.model.pend.numpy())
+      rx_fd   = np.fft.fft(self.rx_sym_td)
+      active  = np.abs(pend_fd) > np.max(np.abs(pend_fd)) * 1e-3
+      H_est   = np.zeros(self.M, dtype=np.complex64)
+      H_est[active] = rx_fd[active] / pend_fd[active]
+      h_est   = np.fft.ifft(H_est)
+      e_total = np.sum(np.abs(h_est)**2) + 1e-12
+      e_cp    = np.sum(np.abs(h_est[:self.Ncp])**2) + np.sum(np.abs(h_est[-self.Ncp:])**2)
+      self._eoo_corr = e_cp / e_total
       self.eoo_smooth = self.ALPHA_EOO * self.eoo_smooth + (1.0 - self.ALPHA_EOO) * self._eoo_corr
       return self.eoo_smooth > self.TEOO
 

@@ -794,7 +794,7 @@ add_test(NAME v2_eoo_awgn_low
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
                        ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/brian_g8sez.wav /dev/null --rate_Fs \
                        --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 \
-                       --end_of_over_v2 --write_rx v2_eoo_tx.f32 --append_noise 1 --EbNodB 1; \
+                       --end_of_over_v2 --write_rx v2_eoo_tx.f32 --append_noise 1 --EbNodB 6; \
                        ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync v2_eoo_tx.f32 /dev/null \
                        --latent-dim 56 --w1_dec 128 --correct_time_offset -8 2>&1 | grep 'EOO detected' && echo PASS || echo FAIL")
          set_tests_properties(v2_eoo_awgn_low PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
@@ -803,7 +803,7 @@ add_test(NAME v2_eoo_mpp_high
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
                        ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/brian_g8sez.wav /dev/null --rate_Fs \
                        --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 \
-                       --end_of_over_v2 --write_rx v2_eoo_tx.f32 --append_noise 1 --g_file g_mpp.f32 --g_offset 2.0; \
+                       --end_of_over_v2 --write_rx v2_eoo_tx.f32 --append_noise 1 --g_file g_mpp.f32; \
                        ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync v2_eoo_tx.f32 /dev/null \
                        --latent-dim 56 --w1_dec 128 --correct_time_offset -8 2>&1 | grep 'EOO detected' && echo PASS || echo FAIL")
          set_tests_properties(v2_eoo_mpp_high PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
@@ -812,7 +812,7 @@ add_test(NAME v2_eoo_mpp_low
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
                        ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/brian_g8sez.wav /dev/null --rate_Fs \
                        --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 \
-                       --end_of_over_v2 --write_rx v2_eoo_tx.f32 --append_noise 1 --g_file g_mpp.f32 --g_offset 2.0 --EbNodB 6; \
+                       --end_of_over_v2 --write_rx v2_eoo_tx.f32 --append_noise 1 --g_file g_mpp.f32 --EbNodB 8; \
                        ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync v2_eoo_tx.f32 /dev/null \
                        --latent-dim 56 --w1_dec 128 --correct_time_offset -8 2>&1 | grep 'EOO detected' && echo PASS || echo FAIL")
          set_tests_properties(v2_eoo_mpp_low PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
