@@ -97,9 +97,9 @@ class RADEv2Receiver:
       self.rx_phase     = 1 + 1j * 0
       self.rx_phase_vec = np.zeros(self.sym_len, dtype=np.csingle)
 
-      # Autocorrelation
-      self.Ry_norm   = np.zeros(self.sym_len, dtype=np.complex64)
-      self.Ry_smooth = np.zeros(self.sym_len, dtype=np.complex64)
+      # Autocorrelation (full CP — drives timing/sync)
+      self.Ry_norm        = np.zeros(self.sym_len, dtype=np.complex64)
+      self.Ry_smooth      = np.zeros(self.sym_len, dtype=np.complex64)
       self.az_hat    = None
 
       # EOO detection: freq-corrected M-sample time domain symbol
@@ -115,7 +115,10 @@ class RADEv2Receiver:
       # SNR estimate from CP autocorrelation peak.
       # CP correlator sees noise in B_bpf, not 3000 Hz, so subtract the offset
       # to express snr_est_dB as SNR3k (C/No/3000).
+      # Linear correction fitted to minimise error across AWGN, MPG, MPP channels.
       self.snr_offset_dB = 10.0 * np.log10(3000.0 / self.B_bpf)
+      self.snr_corr_a = 1.24392558
+      self.snr_corr_b = 3.33253932
       self.snr_est_dB = 0.0
 
 
@@ -177,11 +180,9 @@ class RADEv2Receiver:
       self.Ry_min      = abs_Ry[int(np.argmin(abs_Ry))]
       sig_det  = self.Ry_max > self.TSIG
       sine_det = self.Ry_max / (self.Ry_min + 1e-12) < self.TSIN
-      # SNR estimate: Ry_norm is normalised by (Rx_cp + Rx_m), so
-      # |Ry_smooth| at peak ≈ rho = SNR_bpf/(SNR_bpf+1), giving SNR_bpf = rho/(1-rho).
-      # Subtract snr_offset_dB to convert from SNR_bpf to SNR3k (C/No/3000).
-      rho = np.clip(self.Ry_max, 0.0, 1.0 - 1e-6)
-      self.snr_est_dB = 10.0 * np.log10(rho / (1.0 - rho) + 1e-12) - self.snr_offset_dB
+      rho = np.clip(np.max(np.abs(self.Ry_smooth)), 0.0, 1.0 - 1e-6)
+      snr_raw = 10.0 * np.log10(rho / (1.0 - rho) + 1e-12) - self.snr_offset_dB
+      self.snr_est_dB = self.snr_corr_a * snr_raw + self.snr_corr_b
       return sig_det, sine_det
 
    def _process_idle(self, sig_det, sine_det):
@@ -452,7 +453,7 @@ rx = rx*np.exp(-1j*w_off*np.arange(len(rx)))
 rx = np.concatenate((np.zeros(args.pad_samples, dtype=np.complex64),rx))
 
 rx = rx[:Nmf*(len(rx)//Nmf)]
-print(f"samples: {len(rx):d} Nmf: {Nmf:d} modem frames: {len(rx)//Nmf}")
+print(f"samples: {len(rx):d} Nmf: {Nmf:d} modem frames: {len(rx)//Nmf}", file=sys.stderr)
 
 # TODO: fix contrast of spectrogram - it's not very useful
 if args.plots:
@@ -467,7 +468,7 @@ if args.bpf:
    Ntap=101
    bandwidth = 1.2*(w[Nc-1] - w[0])*model.Fs/(2*np.pi)
    centre = (w[Nc-1] + w[0])*model.Fs/(2*np.pi)/2
-   print(f"Input BPF bandwidth: {bandwidth:f} centre: {centre:f}")
+   print(f"Input BPF bandwidth: {bandwidth:f} centre: {centre:f}", file=sys.stderr)
    bpf = complex_bpf(Ntap, model.Fs, bandwidth, centre, len(rx))
    rx = bpf.bpf(rx)
 
@@ -483,7 +484,7 @@ if args.plots:
 # Acquisition - timing, freq offset, and signal present estimates
 
 sequence_length = len(rx)//(Ncp+M)
-print(sequence_length)
+print(sequence_length, file=sys.stderr)
 
 receiver = RADEv2Receiver(model, frame_sync_nn, args)
 z_hat        = torch.zeros((1, sequence_length, model.latent_dim), dtype=torch.float32)
