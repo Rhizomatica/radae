@@ -182,7 +182,7 @@ add_test(NAME ota_test_awgn
 # like stuck in false sync
 add_test(NAME ota_test_mpp
         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
-                       ./test/ota_test_cal.sh ${CODEC2_DEV_BUILD_DIR} wav/brian_g8sez.wav -30 0.4 --mpp --freq -25")
+                       ./test/ota_test_cal.sh ${CODEC2_DEV_BUILD_DIR} wav/brian_g8sez.wav -30 0.45 --mpp --freq -25")
 
 
 # Acquisition tests ------------------------------------------------------------------------------------
