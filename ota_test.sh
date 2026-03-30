@@ -173,12 +173,13 @@ function process_rx {
     start_rade1=$(python3 -c "start_rade1=6+${x}+0.5; print(\"%f\" % start_rade1)")
     len_rade=$(python3 -c "len_rade=${x}+1.5; print(\"%f\" % len_rade)")
     start_rade2=$(python3 -c "start_rade2=8+2*${x}; print(\"%f\" % start_rade2)")
+    len_rade2=$(python3 -c "len_rade2=${x}+2.5; print(\"%f\" % len_rade2)")
     rx_rade1=$(mktemp)
     rx_rade2=$(mktemp)
     sox $rx ${filename}_ssb.wav trim 5 $x
     sox $rx -t .s16 ${rx_rade1}.raw trim $start_rade1 $len_rade
     sox -t .s16 -r 8000 -c 1 ${rx_rade1}.raw rade1_in.wav # wave version for debugging
-    sox $rx -t .s16 ${rx_rade2}.raw trim $start_rade2
+    sox $rx -t .s16 ${rx_rade2}.raw trim $start_rade2 $len_rade2
     sox -t .s16 -r 8000 -c 1 ${rx_rade2}.raw rade2_in.wav # wave version for debugging
 
     # Use streaming RADE1 Rx
