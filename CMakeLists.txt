@@ -11,7 +11,7 @@ option(BUILD_SHARED_LIBS
 option(AVX "Enable AVX CPU optimizations." ON)
 
 if(NOT CODEC2_DEV_BUILD_DIR)
-    set(CODEC2_DEV_BUILD_DIR $HOME/codec2-dev/build_linux )
+    set(CODEC2_DEV_BUILD_DIR $ENV{HOME}/codec2-dev/build_linux )
 endif()
 
 set(CMAKE_OSX_DEPLOYMENT_TARGET "10.11" CACHE STRING "Minimum OS X deployment version" FORCE)
