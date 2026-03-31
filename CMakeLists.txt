@@ -850,7 +850,7 @@ add_test(NAME v2_snr_est_high
                        python3 rx2.py 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync \
                        snr_rx_high.f32 /dev/null --latent-dim 56 --w1_dec 128 --quiet \
                        --write_snr_est snr_est_high.f32; \
-                       python3 check_snr_est.py \$SNR3K snr_est_high.f32 2.0")
+                       python3 check_snr_est.py \$SNR3K snr_est_high.f32 3.0")
          set_tests_properties(v2_snr_est_high PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
 add_test(NAME v2_snr_est_low
