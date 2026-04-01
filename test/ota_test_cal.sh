@@ -5,14 +5,14 @@
 #
 # test usage:
 #
-#   ~/radae main $ ./test/ota_test_cal.sh ~/codec2-dev/build_linux/ wav/brian_g8sez.wav -20
+#   ~/radae main $ ./test/ota_test_cal.sh ~/radae/build wav/brian_g8sez.wav -20
 
 if [ $# -lt 2 ]; then
-  echo "usage: $0 /path/to/codec2-dev/build No [ch options]"
+  echo "usage: $0 /path/to/radae/build No [ch options]"
   exit 1
 fi
 
-CODEC2_DEV_BUILD_DIR=$1
+RADAE_BUILD_DIR=$1
 wav=$2
 No=$3
 loss_thresh=$4
@@ -29,12 +29,12 @@ printf "\nGenerate tx file and add noise ... \n\n"
 # add 1 second of silence to start to give est_CNo.py a work out
 dd if=/dev/zero of=/dev/stdout bs=16000 count=${silence_duration} | sox -t .s16 -r 8000 -c 1 - sil.wav
 sox sil.wav tx.wav tx_pad.wav
-${CODEC2_DEV_BUILD_DIR}/src/ch tx_pad.wav - --gain ${GAIN} --No ${No} --after_fade --fading_dir . $@ | sox -t .s16 -r 8000 -c 1 - rx.wav
+${RADAE_BUILD_DIR}/src/ch tx_pad.wav - --gain ${GAIN} --No ${No} --after_fade --fading_dir . $@ | sox -t .s16 -r 8000 -c 1 - rx.wav
 
 printf "\nRun chirp only through 'ch' to get reference estimate of C/No ... \n\n"
 ch_log=$(mktemp)
 sox tx.wav -t .s16 - trim 0 4 | \
-~/codec2-dev/build_linux/src/ch - /dev/null --gain ${GAIN} --No ${No} --after_fade --fading_dir . $@ 2>${ch_log}
+${RADAE_BUILD_DIR}/src/ch - /dev/null --gain ${GAIN} --No ${No} --after_fade --fading_dir . $@ 2>${ch_log}
 CNodB_ch=$(cat ${ch_log} | grep "C/No" | tr -s ' ' | cut -d' ' -f5)
 
 printf "\nRun V1 and V2 Rx and check ML "loss" is OK ... \n\n"

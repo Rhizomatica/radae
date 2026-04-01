@@ -4,19 +4,19 @@
 #
 # test usage:
 #
-#   ~/radae main $ ./test/chirp_mpp.sh ~/codec2-dev/build_linux/ -16
+#   ~/radae main $ ./test/chirp_mpp.sh ~/radae/build -16
 
 if [ $# -ne 2 ]; then
-  echo "usage: $0 /path/to/codec2-dev/build No"
+  echo "usage: $0 /path/to/radae/build No"
   exit 1
 fi
 
-CODEC2_DEV_BUILD_DIR=$1
+RADAE_BUILD_DIR=$1
 No=$2
 chirp_duration=4
 silence_duration=3
 
-which ${CODEC2_DEV_BUILD_DIR}/src/ch >/dev/null || { printf "\n**** Can't find ch - check CODEC2_PATH **** \n\n"; exit 1; }
+which ${RADAE_BUILD_DIR}/src/ch >/dev/null || { printf "\n**** Can't find ch - check CODEC2_PATH **** \n\n"; exit 1; }
 
 source test/make_g.sh
 cp -f g_mpp.f32 fast_fading_samples.float
@@ -34,7 +34,7 @@ dd if=/dev/zero of=/dev/stdout bs=16000 count=${silence_duration} > ${silence_in
 cat ${silence_int16} ${chirp_int16} ${silence_int16} > ${chirp_pad_int16}
 # Note --ssbfilt 1 (default) removes -ve freq part of complex noise 
 # which ensures C/No remains unaffected by real() operation at output 
-${CODEC2_DEV_BUILD_DIR}/src/ch ${chirp_pad_int16} ${chirp_noise_int16} --No ${No} --mpp --fading_dir . --after_fade 2>${ch_log}
+${RADAE_BUILD_DIR}/src/ch ${chirp_pad_int16} ${chirp_noise_int16} --No ${No} --mpp --fading_dir . --after_fade 2>${ch_log}
 cat ${chirp_noise_int16} | python3 int16tof32.py  --zeropad > ${chirp_noise_f32}
 est_log=$(mktemp)
 python3 est_CNo.py ${chirp_noise_f32} >${est_log}

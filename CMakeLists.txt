@@ -10,9 +10,7 @@ option(BUILD_SHARED_LIBS
     "Build shared library. Set to OFF for static library." ON)
 option(AVX "Enable AVX CPU optimizations." ON)
 
-if(NOT CODEC2_DEV_BUILD_DIR)
-    set(CODEC2_DEV_BUILD_DIR $ENV{HOME}/codec2-dev/build_linux )
-endif()
+set(CODEC2_DEV_BUILD_DIR "" CACHE PATH "Optional path to codec2-dev build (no longer required)")
 
 set(CMAKE_OSX_DEPLOYMENT_TARGET "10.11" CACHE STRING "Minimum OS X deployment version" FORCE)
 
@@ -171,18 +169,18 @@ add_test(NAME rx_loss_acq_time
 # Estimating C/No on multipath channels using a chirp
 add_test(NAME chirp_mpp
         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
-                       ./test/chirp_mpp.sh ${CODEC2_DEV_BUILD_DIR} -16")
+                       ./test/chirp_mpp.sh ${CMAKE_BINARY_DIR} -16")
 
 # Low SNR ota_test.sh, with chirp measurement, AWGN
 add_test(NAME ota_test_awgn
         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
-                       ./test/ota_test_cal.sh ${CODEC2_DEV_BUILD_DIR} wav/brian_g8sez.wav -24 0.4")
+                       ./test/ota_test_cal.sh ${CMAKE_BINARY_DIR} wav/brian_g8sez.wav -24 0.4")
 
 # Low SNR ota_test.sh, with chirp measurement, MPP, high loss threshold as we only care about gross errors,
 # like stuck in false sync
 add_test(NAME ota_test_mpp
         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
-                       ./test/ota_test_cal.sh ${CODEC2_DEV_BUILD_DIR} wav/brian_g8sez.wav -30 0.45 --mpp --freq -25")
+                       ./test/ota_test_cal.sh ${CMAKE_BINARY_DIR} wav/brian_g8sez.wav -30 0.45 --mpp --freq -25")
 
 
 # Acquisition tests ------------------------------------------------------------------------------------
@@ -191,7 +189,7 @@ add_test(NAME ota_test_mpp
 add_test(NAME acq_noise
         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
                        dd if=/dev/zero of=/dev/stdout bs=16000 count=30 | \
-                       ${CODEC2_DEV_BUILD_DIR}/src/ch - rx.int16 --No -20; \          # real int16 output
+                       ${CMAKE_BINARY_DIR}/src/ch - rx.int16 --No -20; \          # real int16 output
                        cat rx.int16 | python3 int16tof32.py --zeropad > rx.f32; \     # ..IQIQI.. .f32 with Q == 0
                        ./rx.sh model17/checkpoints/checkpoint_epoch_100.pth rx.f32 /dev/null \
                        --pilots --pilot_eq --bottleneck 3 --cp 0.004 --coarse_mag --time_offset -16")
@@ -200,8 +198,8 @@ add_test(NAME acq_noise
 # sine wave + noise-only test, should not acquire 
 add_test(NAME acq_sine
         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
-                       ${CODEC2_DEV_BUILD_DIR}/misc/mksine - 1000 30 | \
-                       ${CODEC2_DEV_BUILD_DIR}/src/ch - rx.int16 --No -20; \          # real int16 output
+                       ${CMAKE_BINARY_DIR}/src/mksine - 1000 30 | \
+                       ${CMAKE_BINARY_DIR}/src/ch - rx.int16 --No -20; \          # real int16 output
                        cat rx.int16 | python3 int16tof32.py --zeropad > rx.f32; \     # ..IQIQI.. .f32 with Q == 0
                        ./rx.sh model17/checkpoints/checkpoint_epoch_100.pth rx.f32 /dev/null \
                        --pilots --pilot_eq --bottleneck 3 --cp 0.004 --coarse_mag --time_offset -16")
@@ -599,7 +597,7 @@ add_test(NAME radae_eoo_data_mpp
                        cat features_in.f32 | PYTHONPATH='.' ${CMAKE_CURRENT_BINARY_DIR}/src/radae_tx > tx.f32; \
                        cat tx.f32 tx.f32 tx.f32 tx.f32 tx.f32 > tx_2.f32;
                        cat tx_2.f32 | python3 f32toint16.py --real --scale 8192 > tx.raw; \
-                       ${CODEC2_DEV_BUILD_DIR}/src/ch tx.raw rx.raw --No -24 --mpp --fading_dir .; \
+                       ${CMAKE_BINARY_DIR}/src/ch tx.raw rx.raw --No -24 --mpp --fading_dir .; \
                        cat rx.raw | python3 int16tof32.py --zeropad > rx.f32; \
                        cat rx.f32 | PYTHONPATH='.' ${CMAKE_CURRENT_BINARY_DIR}/src/radae_rx > /dev/null; \
                        python3 eoo_ber.py eoo_tx.f32 eoo_rx.f32")
@@ -635,7 +633,7 @@ add_test(NAME bbfm_sc_loss
 add_test(NAME bbfm_sc_bpf_loss
         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
                        ./bbfm_inference.sh model_bbfm_01/checkpoints/checkpoint_epoch_100.pth wav/brian_g8sez.wav /dev/null --write_latent z.f32; \
-                       cat z.f32 | python3 sc_tx.py | ${CODEC2_DEV_BUILD_DIR}/src/ch - - | python3 sc_rx.py > z_hat.f32; \
+                       cat z.f32 | python3 sc_tx.py | ${CMAKE_BINARY_DIR}/src/ch - - | python3 sc_rx.py > z_hat.f32; \
                        ./bbfm_rx.sh model_bbfm_01/checkpoints/checkpoint_epoch_100.pth z_hat.f32 /dev/null; \
                        python3 loss.py features_in.f32 features_out.f32 --features_hat2 features_rx_out.f32 --compare")
                        set_tests_properties(bbfm_sc_bpf_loss PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
@@ -774,7 +772,7 @@ add_test(NAME v2_rx2_ch
                        ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/brian_g8sez.wav /dev/null --rate_Fs \
                        --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 \
                        --ssb_bpf --write_rx brian_tx.f32; \
-         cat brian_tx.f32 | python3 f32toint16.py --real --scale 16383 | ~/codec2-dev/build_linux/src/ch - - | python3 int16tof32.py --zeropad > brian_rx.f32
+         cat brian_tx.f32 | python3 f32toint16.py --real --scale 16383 | ${CMAKE_BINARY_DIR}/src/ch - - | python3 int16tof32.py --zeropad > brian_rx.f32
          ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725_ml_sync brian_rx.f32 /dev/null \
          --latent-dim 56 --w1_dec 128 --agc --quiet --write_gain gain.f32 --gain 1.22E-4; \
          python3 loss.py features_in.f32 features_out.f32 --features_hat2 features_out_rx2.f32 --compare --clip_start 50 --clip_end 50")
