@@ -294,7 +294,7 @@ class RADEv2Receiver:
 
    def _update_frame_sync(self, az_hat, sig_det):
       """Update odd/even metrics. Returns decoded features_hat if winning frame, else None."""
-      metric = float(self.frame_sync_nn(az_hat)[0, 0, 0])
+      metric = float(self.frame_sync_nn(az_hat)[0, 0, 0].detach())
       gamma  = self.BETA
       winning = False
       if self.s % 2:
