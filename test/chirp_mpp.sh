@@ -16,7 +16,7 @@ No=$2
 chirp_duration=4
 silence_duration=3
 
-which ${RADAE_BUILD_DIR}/src/ch >/dev/null || { printf "\n**** Can't find ch - check CODEC2_PATH **** \n\n"; exit 1; }
+which ${RADAE_BUILD_DIR}/src/ch >/dev/null || { printf "\n**** Can't find ch - check RADAE_BUILD_DIR (%s) **** \n\n" "${RADAE_BUILD_DIR}"; exit 1; }
 
 source test/make_g.sh
 cp -f g_mpp.f32 fast_fading_samples.float

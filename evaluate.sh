@@ -3,8 +3,7 @@
 # Evaluate a model and sample wave file using AWGN and MPP multipath models, with SSB at same C/No
 
 OPUS=build/src
-CODEC2=${HOME}/codec2-dev/build_linux/src
-PATH=${PATH}:${OPUS}:${CODEC2}
+PATH=${PATH}:${OPUS}
 
 source utils.sh
 

@@ -10,8 +10,6 @@ option(BUILD_SHARED_LIBS
     "Build shared library. Set to OFF for static library." ON)
 option(AVX "Enable AVX CPU optimizations." ON)
 
-set(CODEC2_DEV_BUILD_DIR "" CACHE PATH "Optional path to codec2-dev build (no longer required)")
-
 set(CMAKE_OSX_DEPLOYMENT_TARGET "10.11" CACHE STRING "Minimum OS X deployment version" FORCE)
 
 # Build universal ARM64 and x86_64 binaries on Mac.

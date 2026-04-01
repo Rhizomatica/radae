@@ -74,19 +74,6 @@ The RADE source code is released under the two-clause BSD license.
 
 sox, python3, python3-matplotlib and python3-tqdm, octave, octave-signal, cmake.  Pytorch should be installed using the instructions from the [pytorch](https://pytorch.org/get-started/locally/) web site. 
 
-## codec2-dev
-
-Supplies some utilities used for `ota_test.sh` and `evaluate.sh`.  Removing this dependency is a planned future task.
-```
-cd ~
-git clone https://github.com/drowe67/codec2-dev.git
-cd codec2-dev
-mkdir build_linux
-cd build_linux
-cmake -DUNITTEST=1 ..
-make ch mksine tlininterp
-```
-
 ## RADE
 
 Builds the FARGAN vocoder and ctest framework, most of RADAE is in Python.
@@ -110,10 +97,8 @@ To run the tests:
 cd radae/build
 ctest
 ```
-To list tests `ctest -N`, to run just one test `ctest -R inference_model5`, to run in verbose mode `ctest -V -R inference_model5`.  You can change the paths to `codec2-dev` on the `cmake` command line:
-```
-cmake -DCODEC2_DEV=~/tmp/codec2-dev ..
-```
+To list tests `ctest -N`, to run just one test `ctest -R inference_model5`, to run in verbose mode `ctest -V -R inference_model5`.
+
 A lot of the tests generate a float IQ sample file.  You can listen to this file with: 
 ```
 cat rx.f32 | python3 f32toint16.py --real --scale 8192 | play -t .s16 -r 8000 -c 1 - bandpass 300 2000
@@ -129,9 +114,9 @@ Generate a transmit file from an input speech wav (16 kHz mono):
 ```
 ./ota_test.sh wav/brian_g8sez.wav -x
 ```
-This produces `tx.wav`.  Pass it through the `ch` channel simulator (from `codec2-dev`) to add noise and fading:
+This produces `tx.wav`.  Pass it through the `ch` channel simulator to add noise and fading:
 ```
-~/codec2-dev/build_linux/src/ch tx.wav - --No -20 | sox -t .s16 -r 8000 -c 1 - rx.wav
+./build/src/ch tx.wav - --No -20 | sox -t .s16 -r 8000 -c 1 - rx.wav
 ```
 Decode `rx.wav` and measure ML loss against the original speech:
 ```
@@ -141,10 +126,10 @@ The decoded audio files `rx_ssb.wav`, `rx_rade1.wav`, and `rx_rade2.wav` are wri
 
 The `test/ota_test_cal.sh` script wraps `ota_test.sh` with a calibrated channel simulation suitable for use as a ctest:
 ```
-./test/ota_test_cal.sh ~/codec2-dev/build_linux wav/brian_g8sez.wav -24 0.4
-./test/ota_test_cal.sh ~/codec2-dev/build_linux wav/brian_g8sez.wav -30 0.45 --mpp --freq -25
+./test/ota_test_cal.sh build wav/brian_g8sez.wav -24 0.4
+./test/ota_test_cal.sh build wav/brian_g8sez.wav -30 0.45 --mpp --freq -25
 ```
-Arguments are: path to codec2-dev build, input speech file, noise level (dBW/Hz), loss threshold, and optional channel arguments passed to `ch`.
+Arguments are: path to radae build dir, input speech file, noise level (dBW/Hz), loss threshold, and optional channel arguments passed to `ch`.
 
 
 # Training

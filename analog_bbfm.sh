@@ -2,12 +2,11 @@
 #
 # Analog FM simulation, for comparison to ML BBFM
 
-CODEC2_DEV=${CODEC2_DEV:-${HOME}/codec2-dev}
 OPUS=build/src
-PATH=${PATH}:${OPUS}:${CODEC2_DEV}/build_linux/src
+PATH=${PATH}:${OPUS}
 gain=6
 
-which ch >/dev/null || { printf "\n**** Can't find ch - check CODEC2_PATH **** \n\n"; exit 1; }
+which ch >/dev/null || { printf "\n**** Can't find ch - check radae build (build/src/ch) **** \n\n"; exit 1; }
 
 source utils.sh
 
