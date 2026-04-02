@@ -370,7 +370,8 @@ parser.add_argument('--xcorr_dimension', type=int, help='Dimension of Input cros
 parser.add_argument('--gru_dim', type=int, help='GRU Dimension (fine timing)',default = 64,required = False)
 parser.add_argument('--output_dim', type=int, help='Output dimension (fine timing)',default = 160,required = False)
 parser.add_argument('--write_Ry_smooth', type=str, default="", help='path to smoothed autocorrelation output feature file dim (seq_len,Ncp+M) .c64 format')
-parser.add_argument('--write_delta_hat', type=str, default="", help='path to delta_hat output file dim (seq_len) in .int16 format')
+parser.add_argument('--write_delta_hat', type=str, default="", help='path to delta_hat output file dim (seq_len) in .float32 format')
+parser.add_argument('--write_delta_hat_g', type=str, default="", help='path to delta_hat_g output file dim (seq_len) in .float32 format')
 parser.add_argument('--write_Ry_max', type=str, default="", help='path to Ty_max output file dim (seq_len) in .f32 format')
 parser.add_argument('--write_sig_det', type=str, default="", help='path to signal detection flag output file dim (seq_len) in .int16 format')
 parser.add_argument('--write_freq_offset', type=str, default="", help='path to freq offset est output file dim (seq_len) in .float32 format')
@@ -499,6 +500,7 @@ Ry_norm_log     = np.zeros((sl, sym_len), dtype=np.complex64)
 Ry_smooth_log   = np.zeros((sl, sym_len), dtype=np.complex64)
 sig_det_log     = np.zeros(sl, dtype=np.int16)
 delta_hat_log   = np.zeros(sl, dtype=np.float32)
+delta_hat_g_log = np.zeros(sl, dtype=np.float32)
 freq_offset_log = np.zeros(sl, dtype=np.float32)
 gain_log        = np.zeros(sl, dtype=np.float32)
 snr_est_dB_log  = np.zeros(sl, dtype=np.float32)
@@ -523,6 +525,7 @@ while prx + nin < len(rx):
       Ry_smooth_log[s]     = receiver.Ry_smooth
       sig_det_log[s]       = sig_det
       delta_hat_log[s]     = receiver.delta_hat
+      delta_hat_g_log[s]   = receiver.delta_hat_g
       freq_offset_log[s]   = receiver.freq_offset
       frame_sync_log[s, 0] = receiver.frame_sync_even
       frame_sync_log[s, 1] = receiver.frame_sync_odd
@@ -552,6 +555,8 @@ if len(args.write_Ry_smooth):
    Ry_smooth_log.flatten().tofile(args.write_Ry_smooth)
 if len(args.write_delta_hat):
    delta_hat_log.tofile(args.write_delta_hat)
+if len(args.write_delta_hat_g):
+   delta_hat_g_log.tofile(args.write_delta_hat_g)
 if len(args.write_sig_det):
    sig_det_log.tofile(args.write_sig_det)
 if len(args.write_freq_offset):

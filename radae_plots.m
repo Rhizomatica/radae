@@ -611,3 +611,32 @@ function plot_ber_EbNodB(lin_fn,mse_fn="",phase_fn="",png="", epslatex="")
   end
 
 end
+
+function plot_v2_logs(png_fn, state_fn, delta_hat_fn, delta_hat_g_fn, freq_offset_fn, gain_fn, snr_fn)
+  state = load_raw(state_fn);
+  delta_hat = load_f32(delta_hat_fn,1);
+  delta_hat_g = load_f32(delta_hat_g_fn,1);
+  freq_offset = load_f32(freq_offset_fn,1);
+  gain = load_f32(gain_fn,1);
+  snr = load_f32(snr_fn,1);
+  l = length(state);
+  figure(1); clf;
+  subplot(6,1,1); plot(state,'b;state;');
+  axis([0 l -0.1 1.1]); legend('boxoff')
+  subplot(6,1,2:3);
+  plot(delta_hat,'g;delta\_hat;'); 
+  hold on;
+  plot(delta_hat_g,'b;delta\_hat\_g;');
+  hold off;
+  axis([0 l 0 170]); grid; legend('boxoff')
+  subplot(6,1,4);
+  plot(freq_offset,'b;freq\_offset;'); grid; legend('boxoff')
+  subplot(6,1,5);
+  plot(gain,'b;gain;'); grid; legend('boxoff')
+  subplot(6,1,6);
+  plot(snr,'b;snr dB;'); axis([0 l -10 20]); grid; legend('boxoff')
+
+  if length(png_fn)
+    print("-dpng",png_fn,"-S800,1200");
+  end
+end

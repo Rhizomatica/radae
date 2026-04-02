@@ -156,7 +156,6 @@ if [ "$sample_clock_offset" -eq 1 ]; then
 fi
 
 # debug tips:
-# 1) Use Octave (or uour plotting tool of choice) to plot internal states, e.g. 
 # octave> figure(1); clf; sig_det=load_raw('sig_det.int16'); plot(sig_det); state=load_raw('state.int16'); \
 # hold on; plot(state*1.5); hold off; \
 # figure(2); freq_offset=load_f32('freq_offset.f32',1); plot(freq_offset);
@@ -164,7 +163,7 @@ fi
 ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync 250725_rx.f32 ${wav_out} --latent-dim 56 \
 --w1_dec 128 --correct_time_offset -8 --quiet \
 --write_sig_det sig_det.int16 --write_state state.int16 --write_freq_offset freq_offset.f32 \
---write_frame_sync frame_sync.f32 $@
+--write_frame_sync frame_sync.f32 --write_delta_hat delta_hat.f32 --write_delta_hat_g delta_hat_g.f32 $@
 
 # debug tip: run from cmd line with --plot
 python3 loss.py features_in.f32 features_out.f32 --features_hat2 features_out_rx2.f32 \

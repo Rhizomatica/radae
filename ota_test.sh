@@ -181,7 +181,12 @@ function process_rx {
     cat ${rx_rade2}.raw | python3 int16tof32.py --zeropad > ${rx_rade2}.f32
     ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync ${rx_rade2}.f32 ${filename}_rade2.wav \
     --latent-dim 56 --w1_dec 128 --gain 1.22E-4 --agc --correct_time_offset -8 \
-    --write_delta_hat delta_hat.f32 --write_gain gain.f32 --write_freq_offset freq_offset.f32 --write_Ry_smooth Ry_smooth.c64 2>>${filename}_report.txt
+    --write_state state.int16 --write_delta_hat delta_hat.f32 --write_delta_hat_g delta_hat_g.f32 \
+    --write_gain gain.f32 --write_freq_offset freq_offset.f32 --write_snr_est snr_est.f32 2>>${filename}_report.txt
+    DISPLAY=""; echo "warning('off', 'all'); \
+      radae_plots; \
+      plot_v2_logs('${filename}_plots.png', 'state.int16', 'delta_hat.f32','delta_hat_g.f32','freq_offset.f32','gain.f32','snr_est.f32'); \
+      quit;" | octave-cli -qf > /dev/null
 
     # optionally calculate loss using feature files derived from input wave file basename
     if [ ! ${loss_input_wav_file} == "" ]; then
