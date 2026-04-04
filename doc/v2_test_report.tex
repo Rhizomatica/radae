@@ -52,7 +52,7 @@ Over the course of 2025 and early 2026 David has been developing RADE V2, which 
 \item No pilot or unique word symbols, saving bandwidth and power.
 \item A $N_c=14$ carrier waveform with a 800 \si{Hz} 99\% power occupied bandwidth (OBW), that is narrower and cleaner than V1.
 \item PAPR defined by training, making it relatively insensitive to transmitter filtering.
-\item Low latency frame of around 40 \si{ms} compared to 200 \si{ms} for comparable (e.g. RADE V1) waveforms.
+\item Low latency frame of around 40 \si{ms} compared to 180 \si{ms} for comparable (e.g. RADE V1 or classical) waveforms.
 \item ML based frame sync that functions without pilot or unique word symbols.
 \end{itemize}
 Jean-Marc again assisted with suggestions for timing and frequency offset estimation algorithm based on autocorrelation of the received signal.
@@ -71,6 +71,7 @@ The FreeDV Project Leadership Team and many others have helped with support and 
   AGC & Automatic Gain Control. \\
   AWGN & Additive White Gaussian noise - a channel model without fading. \\
   loss & A dimensionless measure of distortion in our ML model, based on the distance between the vocoder feature vectors at the encoder and decoder. \\
+  EOO & End of Over detection system, a special frame that is used by the transmitter to tell the receiver to stop decoding immediately. \\
   ML & Machine Learning. \\
   MPD & Multipath disturbed - a channel model for a very poor HF channel with 2 \si{Hz} fading and 4 \si{ms} delay spread. \\
   MPP & Multipath Poor - a channel model for a poor HF channel with 1 \si{Hz} fading and 2 \si{ms} delay spread. \\
@@ -335,11 +336,46 @@ A Rx frequency offset drifting at -5 \si{Hz} per minute was tested. No significa
  delta=0.02 ./test/v2_spot.sh --g_file g_mpp.f32 --EbNodB 10 --df_dt -0.1
 \end{verbatim}
 
+\subsection{End of Over Detection}
+
+This section describes the End of Over (EOO) system performance.  When the transmission is about to cease, a special EOO frame is sent to instruct the receiver to immediately stop decoding.  This prevents decoding of spurious received signal and unwanted ``R2D2" tones emerging from the decoder at the end of a transmission.  The design goal is reliable operation in high SNR benign channels.  In poor channels (e.g. low SNR MPP), it is acceptable to have a lower probability of EOO detection, as clean end of over behaivour is a secondary requirement in the low SNR use case.  In all channels, should the EOO frame not be detected, the hangover counter in the receiver state machine will eventually stop decoding after a few seconds.
+
+The script \emph{eoo\_detect\_prob.sh} generates $N=20$ by 9 \si{s} duration samples (extracted from \emph{all.wav}) each terminated in an EOO frame.  The number of sucessful EOO detections is counted to determine the probability of EOO detection for each condition.  The 9 \si{s} duration is chosen to ensure the alignment shifts between \emph{all.wav} and \emph{g\_mpp.f32} as the trials modulo rotate around each file.  Note the sharp knee in the AWGN performance at around 1 \si{dB}.
+
+\begin{table} [h]
+\caption{End of Over Probability of Detection over $N=20$ trials}
+\label{tab:eoo_p_detetc}
+\centering
+\begin{tabular}{ c | c | r | r }
+ \hline
+ Channel & EbNodB & SNR (\si{dB}) & P(detect) \\
+ \hline
+ AWGN & 100 & 100 & 1.00 \\
+ AWGN & 10 & 3.5 & 1.0 \\
+ AWGN & 8 &  1.5 & 1.0 \\
+ AWGN & 6 & -0.5 & 0.0 \\
+ MPP & 100 & 100 &  1.0 \\
+ MPP & 10 & 4.5 & 1.0 \\
+ MPP & 6 & -0.5 & 0.3 \\
+ MPP & 3 & -3.5 & 0.0 \\
+ \hline
+\end{tabular}
+\end{table}
+
+The script \emph{eoo\_false\_prob.sh} counts how many times the EOO detection system detects a EOO frame when none is present (false detection), e.g. due to the regular payload V2 OFDM symbols resembling an EOO frame. This is undesirable as the receiver would stop decoding mid-over and have to re-acquire. The longest source file tested was \emph{librispeech.wav} (used for ASR testing) at 540 seconds with no false detections.  The source file \emph{all.wav} was also tested with various channel conditions (e.g. 10 trials over a MPP channel at 3.5 dB SNR) with no false detections.
+
+Sample command lines:
+\begin{verbatim}
+ ./test/eoo_detect_prob.sh --channel mpp --EbNodB 10
+ ./test/eoo_false_prob.sh
+\end{verbatim}
+
 \subsection{Initial Over the Air Tests}
 
 This section describes initial OTA tests using the stored file test system implemented by the script \emph{ota\_test.sh}. The purpose of these tests is to verify that V2 does indeed work over real world HF Radio channels, and prepare the test software for a wider test campaign.
 
-TODO:
+TODO: copy Mar blog post text and results.  Maybe get a few more results from Lee, or a third party, so it get's tested in different ways.
+
 \begin{enumerate}
 \item Listen to simulated tests with several speakers across "4 channel points" to spot and fix any obvious issues.
 \item Over The Cable (OTC) test to measure loss from passing V2 through real radios with a known benign channel. This can then be used to benchmark the use of other applications (e.g. freedv-gui) and radios.
@@ -364,8 +400,8 @@ Handles MPD channel without breaking down & Pass & \\
 PAPR $< 1$ \si{dB}| through a typical SSB band pass filter. & Partial & This requirement was found to be in error, real world PAPR of RADE V1 was $>$ 4 \si{dB}.  We have achieved a PAPR of $\approx 3$ \si{dB} with V2, a 1 \si{dB} gain on V1. \\
 OBW $<$ 2000 \si{Hz} & Pass & V2 OBW measured as $\approx 860$ \si{Hz}, much cleaner spectrum. \\ 
 Frequency Offsets $\pm 50$ \si{Hz} & Partial & Current algorithm natively handles $\pm 32$ \si{Hz}, should be possible to extend this with further work. \\
-Clean end of over detection within 100 ms & Partial & Not met with current state machine, requires the addition of an end of over frame and detection logic. \\
-25 bit/s streaming text for callsign & Partial & Waveform can send 1 bit/frame over channel, but streaming text support not implemented yet. \\
+Clean end of over detection within 100 ms & Pass & EOO works well at moderate to high SNRs \\
+25 bit/s streaming text for callsign & Incomplete & Waveform can send 1 bit/frame over channel, but streaming text support not implemented yet. \\
 SNR estimation & Fail & Not implemented yet. Challenging given lack of known symbols. \\
 \hline
 \end{tabular}
@@ -375,7 +411,7 @@ SNR estimation & Fail & Not implemented yet. Challenging given lack of known sym
 
 Topics for future development. It may be possible to attend to these in parallel with crowd sourced V2 testing, as they have little impact of core requirements such as speech quality and robustness.
 \begin{itemize}
-\item End of Over System.
+\item Improved EOO performance at lower SNRs.
 \item SNR estimator.
 \item Streaming text.
 \item Extend range of frequency offset estimation.

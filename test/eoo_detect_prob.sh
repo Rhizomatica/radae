@@ -10,7 +10,9 @@
 EbNodB=100
 channel=awgn
 N=20
-seg_len=2   # seconds per trial
+seg_len=9   # seconds per trial, make it long compared to fading duration
+            # and such that wav_dur/seg_len and g_mpp_dur/seg_len are not integers - 
+            # so sucessive trial are not aligned with either file
 verbose=0
 
 function print_help {
@@ -36,7 +38,7 @@ done
 
 if [ "$channel" = "mpp" ]; then
     chan_args="--g_file g_mpp.f32"
-    g_step=10.0
+    g_step=$seg_len
 elif [ "$channel" = "awgn" ]; then
     chan_args=""
 else
@@ -45,7 +47,8 @@ else
 fi
 
 wav_dur=$(soxi -D wav/all.wav)
-g_mpp_dur=$(python3 -c "import os; print(os.path.getsize('g_mpp.f32')//(4*2*8000))")
+# 2 complex numbers per time step
+g_mpp_dur=$(python3 -c "import os; print(os.path.getsize('g_mpp.f32')//(2*2*4*8000))")
 
 detected=0
 rx_tmp=$(mktemp /tmp/eoo_detect_XXXXXX.f32)
@@ -55,13 +58,13 @@ trap "rm -f $rx_tmp $wav_tmp" EXIT
 echo "EOO detection probability: EbNodB=$EbNodB channel=$channel N=$N seg_len=${seg_len}s"
 
 for i in $(seq 1 $N); do
-    offset=$(python3 -c "print((($i-1)*$seg_len) % int($wav_dur))")
+    offset=$(python3 -c "print((($i-1)*$seg_len) % (int($wav_dur)-$seg_len))")
     sox wav/all.wav $wav_tmp trim $offset $seg_len
 
     g_offset_args=""
     g_off=0
     if [ "$channel" = "mpp" ]; then
-        g_off=$(python3 -c "print((($i-1)*$g_step) % $g_mpp_dur)")
+        g_off=$(python3 -c "print((($i-1)*$g_step) % ($g_mpp_dur-$seg_len))")
         g_offset_args="--g_offset $g_off"
     fi
 
@@ -80,9 +83,9 @@ for i in $(seq 1 $N); do
 
     if [ "$result" -gt 0 ]; then
         detected=$((detected + 1))
-        echo "  trial $i: DETECTED (offset=${offset}s g_offset=$g_off)"
+        echo "  trial $i: DETECTED (wav_dur=$wav_dur offset=${offset}s g_mpp_dur=$g_mpp_dur g_offset=$g_off)"
     else
-        echo "  trial $i: missed   (offset=${offset}s g_offset=$g_off)"
+        echo "  trial $i: missed   (wav_dur=$wav_dur offset=${offset}s g_mpp_dur=$g_mpp_dur g_offset=$g_off)"
     fi
 done
 

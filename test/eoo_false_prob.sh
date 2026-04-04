@@ -12,12 +12,13 @@
 EbNodB=100
 channel=awgn
 N=20
+wav=wav/all.wav
 
 function print_help {
     echo
     echo "Measure RADE V2 EOO false detection rate"
     echo
-    echo "  usage: ./test/eoo_false_prob.sh [--EbNodB dB] [--channel awgn|mpp] [--N trials]"
+    echo "  usage: ./test/eoo_false_prob.sh [--EbNodB dB] [--channel awgn|mpp] [--N trials] [--wav wavefile]"
     echo "  example: ./test/eoo_false_prob.sh --EbNodB 10 --channel mpp --N 20"
     echo
     exit
@@ -28,17 +29,18 @@ while [[ $# -gt 0 ]]; do
         --EbNodB)  EbNodB=$2;  shift 2 ;;
         --channel) channel=$2; shift 2 ;;
         --N)       N=$2;       shift 2 ;;
+        --wav)     wav=$2;     shift 2 ;;
         -h|--help) print_help ;;
         *) echo "Unknown argument: $1"; print_help ;;
     esac
 done
 
-wav_dur=$(soxi -D wav/all.wav)
+wav_dur=$(soxi -D $wav)
 
 if [ "$channel" = "mpp" ]; then
     chan_args="--g_file g_mpp.f32"
     g_step=$(python3 -c "print(int($wav_dur))")   # step by one wav length per trial
-    g_mpp_dur=$(python3 -c "import os; print(os.path.getsize('g_mpp.f32')//(4*2*8000))")
+    g_mpp_dur=$(python3 -c "import os; print(os.path.getsize('g_mpp.f32')//(2*2*4*8000))")
 elif [ "$channel" = "awgn" ]; then
     chan_args=""
 else
@@ -60,7 +62,7 @@ for i in $(seq 1 $N); do
         g_offset_args="--g_offset $g_off"
     fi
 
-    ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/all.wav /dev/null --rate_Fs \
+    ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth $wav /dev/null --rate_Fs \
         --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 \
         --write_rx $rx_tmp --EbNodB $EbNodB \
         $chan_args $g_offset_args 2>/dev/null
