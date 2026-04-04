@@ -108,13 +108,15 @@ The scaling `--scale` is required as the low SNRs mean the noise peak amplitude 
 
 # Over the Air/Over the Cable (OTA/OTC)
 
-The `ota_test.sh` script supports stored-file over-the-air and over-the-cable testing.  It assembles a transmit file containing a chirp reference, compressed SSB, RADE V1, and RADE V2 signals in sequence, which can be sent over a real SSB radio or processed through a channel simulator.
+The `ota_test.sh` script supports stored-file over-the-air and over-the-cable testing.  It assembles a transmit file containing a chirp reference, compressed SSB, RADE V1, and RADE V2 signals in sequence, which can be sent over a real HF channel or processed through a channel simulator.  The script performs a *controlled* test of RADE V2 over real world channels.
 
 Generate a transmit file from an input speech wav (16 kHz mono):
 ```
 ./ota_test.sh wav/brian_g8sez.wav -x
 ```
-This produces `tx.wav`.  Pass it through the `ch` channel simulator to add noise and fading:
+This produces `tx.wav`, which is suitable for transmission OTA using your SSB transmitter.  We then use a remote HF receiver to sample the received signal to a wave file, e.g. `rx.wav`.
+
+To simulate a real HF channel pass it through the `ch` channel simulator to add noise and fading:
 ```
 ./build/src/ch tx.wav - --No -20 | sox -t .s16 -r 8000 -c 1 - rx.wav
 ```
@@ -122,15 +124,9 @@ Decode `rx.wav` and measure ML loss against the original speech:
 ```
 ./ota_test.sh -r rx.wav -l wav/brian_g8sez.wav
 ```
-The decoded audio files `rx_ssb.wav`, `rx_rade1.wav`, and `rx_rade2.wav` are written to the same directory as `rx.wav`.
+The decoded audio files `rx_ssb.wav`, `rx_rade1.wav`, and `rx_rade2.wav` are written to the same directory as `rx.wav`. A report file and spectrogram is also produced, including objective loss measurements (if `-l` option used).
 
-The `test/ota_test_cal.sh` script wraps `ota_test.sh` with a calibrated channel simulation suitable for use as a ctest:
-```
-./test/ota_test_cal.sh build wav/brian_g8sez.wav -24 0.4
-./test/ota_test_cal.sh build wav/brian_g8sez.wav -30 0.45 --mpp --freq -25
-```
-Arguments are: path to radae build dir, input speech file, noise level (dBW/Hz), loss threshold, and optional channel arguments passed to `ch`.
-
+See `ota_test.sh` for more information.
 
 # Training
 
