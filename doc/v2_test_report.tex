@@ -370,6 +370,23 @@ Sample command lines:
  ./test/eoo_false_prob.sh
 \end{verbatim}
 
+\subsection{SNR Estimator}
+
+Figure \ref{fig:v2_snr_est} illustrates the SNR estimator performance.  SNR estimation for RADE V2 is challenging due to the lack of pilot symbols.  The algorithm used is based on the autocorrelation of cylic prefix and works well for AWGN channels, but accuracy suffers in multipath channels.  A straight line correction was applied to minimise overall the error for three common channels over the -5 to +5 \si{dB} range.  It is most accurate for slowly fading channels (MPG).
+
+\begin{figure}[H]
+\caption{Mean estimated SNR against actual SNR for several channels with noise measured in a 3 \si{kHz} bandwdth. Over the -5 to +5 dB interval the RMS error is 1.5 \si{dB} with worst case 2.8 \si{dB}.}
+\label{fig:v2_snr_est}
+\begin{center}
+\scalebox{.9}{\input {v2_snr_est.tex}}
+\end{center}
+\end{figure}
+
+Sample command line:
+\begin{verbatim}
+./test/snr_est_test.sh --channel mpp | tee snr_est_mpp.txt
+\end{verbatim}
+
 \subsection{Initial Over the Air Tests}
 
 This section describes initial OTA tests using the stored file test system implemented by the script \emph{ota\_test.sh}. The purpose of these tests is to verify that V2 does indeed work over real world HF Radio channels, and prepare the test software for a wider test campaign.

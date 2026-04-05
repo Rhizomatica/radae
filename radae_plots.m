@@ -1,5 +1,5 @@
 # radae_plots.m
-# Octave helper script to generate some plots form inference.py outputs
+# Octave helper scripts for RADE
 
 1;
 pkg load statistics signal;
@@ -334,7 +334,7 @@ function test_rate_Fs_bottleneck
   
 end
 
-% Latex plotting for SNR estimator. run est_snr_curves.sh first
+% Latex plotting for V1 SNR estimator. run est_snr_curves.sh first
 function est_snr_plot(epslatex="")
     if length(epslatex)
         [textfontsize linewidth] = set_fonts();
@@ -640,3 +640,35 @@ function plot_v2_logs(png_fn, state_fn, delta_hat_fn, delta_hat_g_fn, freq_offse
     print("-dpng",png_fn,"-S800,1200");
   end
 end
+
+% Latex plotting for V2 SNR estimator for V2 test report, first run:
+%
+% ./test/snr_est_test.sh --channel awgn | tee snr_est_awgn.txt
+% ./test/snr_est_test.sh --channel mpg | tee snr_est_mpg.txt
+% ./test/snr_est_test.sh --channel mpp | tee snr_est_mpp.txt
+
+function v2_est_snr_plot(epslatex="")
+    if length(epslatex)
+        [textfontsize linewidth] = set_fonts();
+    end
+    awgn = load("snr_est_awgn.txt");
+    mpg = load("snr_est_mpg.txt");
+    mpp = load("snr_est_mpp.txt");
+    
+    figure(1); clf;
+    plot(-5:15, -5:15,'bk--;ideal;');
+    hold on;
+    #[m b] = linreg(awgn(:,2), awgn(:,3),length(awgn(:,1)));
+    plot(awgn(:,2), awgn(:,3),'g-;AWGN;');
+    #[m b] = linreg(mpg(:,2), mpg(:,3),length(mpg(:,1)));
+    plot(mpg(:,2),mpg(:,3),'b-;MPG;');
+    #[m b] = linreg(mpp(:,2), mpp(:,3),length(mpp(:,1)));
+    plot(mpp(:,2),mpp(:,3),'r-;MPP;');
+    hold off;
+    axis([-5 15 -5 15]); legend('location','southeast'); legend('boxoff');
+    grid('minor'); xlabel('SNR (dB)'); ylabel('SNR Est (dB)');
+    if length(epslatex)
+        print_eps_restore(sprintf("%s",epslatex),"-S300,250",textfontsize,linewidth);
+    end
+endfunction
+
