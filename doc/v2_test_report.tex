@@ -209,7 +209,7 @@ Several properties of the acquisition subsystem were tested:
 \item Ability to re-acquire a second RADE V2 signal (with a different frequency offset and timing) just after the first V2 signal ends.
 \end{enumerate}
 
-Acquisition time was characterised using \emph{v2\_spot.sh}. Note we prepend 1 second of silence in these tests which is subtracted for the reported \emph{acq\_time} to obtain the results in the Table \ref{tab:time_to_acq}.  Acquisition time becomes longer as SNR drops, which is quite acceptable.  High SNR acquisition time on a good channel of 200 \si{ms} is usable (similar to RADE V1) but a little slow given the decoder latency of 40 \si{ms} so as further work it would be nice to improve this.  This is partially due to state machine design that is optimised for low SNR channels.  It may be possible to modify the state machine to transition quickly if the probability of a valid signal is high, for example sum the probabilities until a threshold is reached rather than using a fixed time (state machine counter) to validate the signal.
+Acquisition time was characterised using \emph{v2\_spot.sh}. Note we prepend 1 second of silence in these tests which is subtracted for the reported \emph{acq\_time} to obtain the results in the Table \ref{tab:time_to_acq}.  Acquisition time becomes longer as SNR drops, which is quite acceptable.  High SNR acquisition time on a good channel of 200 \si{ms} is usable (similar to RADE V1) but a little slow given the decoder latency of 40 \si{ms} so as further work it would be desirable to improve this.  This is partially due to state machine design that is optimised for low SNR channels.  It may be possible to modify the state machine to transition quickly if the probability of a valid signal is high, for example sum the probabilities until a threshold is reached rather than using a fixed time (state machine counter) to validate the signal.
 
 \begin{table} [h]
 \caption{Time to acquisition $T_{aq}$.}
@@ -281,7 +281,7 @@ The ability to acquire with an additive sinewave was tested using \emph{v2\_spot
 --EbNodB 10 --reset_output_on_resync
 \end{verbatim}
 
-This generates signal2 (-25 \si{Hz} frequency offset) which is placed just before the target signal1 (25 \si{Hz} frequency offset) with 0 \si{ms} delay.  The test then measures the loss of signal1; a low loss is expected if re-acquisition is successful. The \emph{prepend\_noise} argument was chosen so that the timing offset was just on a symbol boundary($\hat{\delta} \approx 160$), a worst case location for the acquisition system. Table \ref{tab:re_acq} presents the results for a few spot tests.  The losses are in all case approximately the same as for signal1 alone which indicated sucessful re-acquisition and a pass.  The counter-intuitive lower loss for the MPP result with two signals can be explained by the MPP channel being a little more benign (on average) over the longer test period (signal2 10 seconds, signal1 is 56 seconds in length).
+This generates signal2 (-25 \si{Hz} frequency offset) which is placed just before the target signal1 (25 \si{Hz} frequency offset) with 0 \si{ms} delay.  The test then measures the loss of signal1; a low loss is expected if re-acquisition is successful. The \emph{prepend\_noise} argument was chosen so that the timing offset was just on a symbol boundary($\hat{\delta} \approx 160$), a worst case location for the acquisition system. Table \ref{tab:re_acq} presents the results for a few spot tests.  The losses are in all case approximately the same as for signal1 alone which indicated successful re-acquisition and a pass.  The counter-intuitive lower loss for the MPP result with two signals can be explained by the MPP channel being a little more benign (on average) over the longer test period (signal2 10 seconds, signal1 is 56 seconds in length).
 
 \begin{table} [h]
 \caption{Re-acquisition test.}
@@ -338,9 +338,9 @@ A Rx frequency offset drifting at -5 \si{Hz} per minute was tested. No significa
 
 \subsection{End of Over Detection}
 
-This section describes the End of Over (EOO) system performance.  When the transmission is about to cease, a special EOO frame is sent to instruct the receiver to immediately stop decoding.  This prevents decoding of spurious received signal and unwanted ``R2D2" tones emerging from the decoder at the end of a transmission.  The design goal is reliable operation in high SNR benign channels.  In poor channels (e.g. low SNR MPP), it is acceptable to have a lower probability of EOO detection, as clean end of over behaivour is a secondary requirement in the low SNR use case.  In all channels, should the EOO frame not be detected, the hangover counter in the receiver state machine will eventually stop decoding after a few seconds.
+This section describes the End of Over (EOO) system performance.  When the transmission is about to cease, a special EOO frame is sent to instruct the receiver to immediately stop decoding.  This prevents decoding of spurious received signal and unwanted ``R2D2" tones emerging from the decoder at the end of a transmission.  The design goal is reliable operation in high SNR benign channels.  In poor channels (e.g. low SNR MPP), it is acceptable to have a lower probability of EOO detection, as clean end of over behaviour is a secondary requirement in the low SNR use case.  In all channels, should the EOO frame not be detected, the hangover counter in the receiver state machine will eventually stop decoding after a few seconds.
 
-The script \emph{eoo\_detect\_prob.sh} generates $N=20$ by 9 \si{s} duration samples (extracted from \emph{all.wav}) each terminated in an EOO frame.  The number of sucessful EOO detections is counted to determine the probability of EOO detection for each condition.  The 9 \si{s} duration is chosen to ensure the alignment shifts between \emph{all.wav} and \emph{g\_mpp.f32} as the trials modulo rotate around each file.  Note the sharp knee in the AWGN performance at around 1 \si{dB}.
+The script \emph{eoo\_detect\_prob.sh} generates $N=20$ by 9 \si{s} duration samples (extracted from \emph{all.wav}) each terminated in an EOO frame.  The number of successful EOO detections is counted to determine the probability of EOO detection for each condition.  The 9 \si{s} duration is chosen to ensure the alignment shifts between \emph{all.wav} and \emph{g\_mpp.f32} as the trials modulo rotate around each file.  Note the sharp knee in the AWGN performance at around 1 \si{dB} SNR.
 
 \begin{table} [h]
 \caption{End of Over Probability of Detection over $N=20$ trials}
@@ -372,10 +372,10 @@ Sample command lines:
 
 \subsection{SNR Estimator}
 
-Figure \ref{fig:v2_snr_est} illustrates the SNR estimator performance.  SNR estimation for RADE V2 is challenging due to the lack of pilot symbols.  The algorithm used is based on the autocorrelation of cylic prefix and works well for AWGN channels, but accuracy suffers in multipath channels.  A straight line correction was applied to minimise overall the error for three common channels over the -5 to +5 \si{dB} range.  It is most accurate for slowly fading channels (MPG).
+Figure \ref{fig:v2_snr_est} illustrates the SNR estimator performance.  SNR estimation for RADE V2 is challenging due to the lack of pilot symbols.  The algorithm used is based on the autocorrelation of cyclic prefix and works well for AWGN channels, but accuracy suffers in multipath channels.  A straight line correction was applied minimise the error over three common channels over the -5 to +5 \si{dB} range.  It is most accurate for slowly fading channels (MPG).
 
 \begin{figure}[H]
-\caption{Mean estimated SNR against actual SNR for several channels with noise measured in a 3 \si{kHz} bandwdth. Over the -5 to +5 dB interval the RMS error is 1.5 \si{dB} with worst case 2.8 \si{dB}.}
+\caption{Mean estimated SNR against actual SNR for several channels with noise measured in a 3 \si{kHz} bandwidth. Over the -5 to +5 dB interval the RMS error is 1.5 \si{dB} with worst case 2.8 \si{dB}.}
 \label{fig:v2_snr_est}
 \begin{center}
 \scalebox{.9}{\input {v2_snr_est.tex}}
@@ -389,37 +389,53 @@ Sample command line:
 
 \subsection{Initial Over the Air Tests}
 
-This section describes initial OTA tests using the stored file test system implemented by the script \emph{ota\_test.sh}. The purpose of these tests is to verify that V2 does indeed work over real world HF Radio channels, and prepare the test software for a wider test campaign.
+This section describes initial OTA tests using the stored file test system implemented by the script \emph{ota\_test.sh}.  The purpose of these tests was (a) see if RADE V2 actually works over real world HF channels (b) compare V2 to RADE V1 to determine if there is any improvement at low and high SNRs.  The simulated results presented above predict a 3 dB increase in sensitivity at low SNRs.  At high SNRs the ML network “loss” is significantly lower for V2, but we are not sure what that means in terms of speech quality.
 
-TODO: copy Mar blog post text and results.  Maybe get a few more results from Lee, or a third party, so it get's tested in different ways.
+The \emph{ota\_test.sh} script generates a file consisting of a chirp – SSB RADE V1 – RADE V2 in sequence. This was transmitted from the authors home station (IC7200 transmitter) to various KiwiSDRs around Australia.  The chirp is used to estimate SNR of the channel, and SSB and RADE V1 are included for comparison. By sending all 4 signals at approximately the same time, we have them passing over roughly the same HF channel. In addition, several tests were conducted "Over The Cable" (OTC)- using a local (FT817) receiver connected to the transmitter via attenuators and cable - providing a ``perfect" channel.  A total of 17 test were performed during March 2026. In each case RADE V2 worked well on real HF channels, supporting the functional test aim (a) above.
 
-\begin{enumerate}
-\item Listen to simulated tests with several speakers across "4 channel points" to spot and fix any obvious issues.
-\item Over The Cable (OTC) test to measure loss from passing V2 through real radios with a known benign channel. This can then be used to benchmark the use of other applications (e.g. freedv-gui) and radios.
-\item A limited set of OTA tests by at least two operators in different parts of the world.
-\item Debug test script and fix any V2 bugs revealed.
-\end{enumerate}
+Selected speech samples are available \href{https://freedv.org/david-march-2026-ai-v1-c-port-qa-claude-code-v2-eoo-and-snr-stored-file-ota-tests/}{here}.
+
+It can be difficult to discern fine differences in speech samples using ad hoc listening tests. To help with this problem, the OTA test software measures the “loss” between the vocoder features at the input of the RADE encoder, to the output of the RADE decoder.  Table \ref{tab:ota_loss} is a table of the “loss” for a selection of OTA and OTC samples. It can be seen that when sent over the same channel at (almost) the same time, the RADE V2 samples achieve an equal or lower loss than RADE V1, supporting the simulation results above.
+
+\begin{table} [h]
+\caption{Loss for various samples from the OTA test campaign. The “Software” columns are the loss from software encoding only, before transmission over the channel. A perfect channel (like v216) achieves very close to these loss values.}
+\label{tab:ota_loss}
+\centering
+\begin{tabular}{ l | l | c | c | c | c | c }
+ \hline
+ Sample	& Speaker & V1 software & V2 software & Channel & V1 OTA & V2 OTA \\
+ \hline
+ v208 &	David &	0.102 &	0.077 &	NVIS & 0.132 & 0.132 \\
+ v209 &	David &	0.102 &	0.077 &	NVIS & 0.141 & 0.125 \\
+ v211 &	David & 0.102 &	0.077 &	DX   & 0.520 & 0.154 \\
+ v216 &	Brian &	0.115 &	0.086 &	OTC  & 0.123 & 0.096 \\
+ v217 &	Brian &	0.115 &	0.086 &	DX   & 0.311 & 0.198 \\
+ \hline
+\end{tabular}
+\end{table}
+
+The OTC tests (e.g. v216) show very little impact on the loss metric, demonstrating that the signal processing through two typical HF radios (USB sound hardware, SSB filters, PA, up and down conversion) has very little impact on the RADE waveforms. This suggests loss measurements can be used as a metric for ``type approval" of RADE integration e.g. with a SDR, end user application, or hardware radio.
 
 \section{Conclusion}
 
-In Table \ref{tab:re_acq} the results from this test campaign are summarised and compared to requirements extracted from FreeDV-038.  Only performance and functional requirements have been extracted (e.g. we don't consider implementation issues like a C port or packaging).
+In Table \ref{tab:conclusion} the results from this test campaign are summarised and compared to requirements extracted from FreeDV-038.  Only performance and functional requirements have been extracted (e.g. we don't consider implementation issues like a C port or packaging).
 
 \begin{table} [h]
 \caption{Test results compared to performance requirements}
-\label{tab:re_acq}
+\label{tab:conclusion}
 \centering
 \begin{tabular}{ p{5cm} | p{1cm} | p{5cm}  }
 \hline
 Requirement & Met & Comment \\
 \hline
-Speech quality v SNR $\ge$ RADE V1 on AWGN \& MPP. & Pass & $\approx 3$ \si{dB} gain \\
+Speech quality v SNR $\ge$ RADE V1 on AWGN \& MPP. & Pass & $\approx 3$ \si{dB} gain in simulations, supported by OTA tests. \\
 Handles MPD channel without breaking down & Pass & \\
 PAPR $< 1$ \si{dB}| through a typical SSB band pass filter. & Partial & This requirement was found to be in error, real world PAPR of RADE V1 was $>$ 4 \si{dB}.  We have achieved a PAPR of $\approx 3$ \si{dB} with V2, a 1 \si{dB} gain on V1. \\
 OBW $<$ 2000 \si{Hz} & Pass & V2 OBW measured as $\approx 860$ \si{Hz}, much cleaner spectrum. \\ 
 Frequency Offsets $\pm 50$ \si{Hz} & Partial & Current algorithm natively handles $\pm 32$ \si{Hz}, should be possible to extend this with further work. \\
-Clean end of over detection within 100 ms & Pass & EOO works well at moderate to high SNRs \\
-25 bit/s streaming text for callsign & Incomplete & Waveform can send 1 bit/frame over channel, but streaming text support not implemented yet. \\
-SNR estimation & Fail & Not implemented yet. Challenging given lack of known symbols. \\
+Clean end of over detection within 100 ms & Pass & EOO works well at moderate to high SNRs. \\
+25 bit/s streaming text for callsign & Partial & Waveform can send 1 bit/frame over channel, but streaming text support not implemented yet. \\
+SNR estimation & Pass & Error of 1.5 dB RMS ($\pm 3 \si{dB}$ max) over -5 to +5 \si{dB}. \\
 \hline
 \end{tabular}
 \end{table}
@@ -427,11 +443,12 @@ SNR estimation & Fail & Not implemented yet. Challenging given lack of known sym
 \subsection{Further Work}
 
 Topics for future development. It may be possible to attend to these in parallel with crowd sourced V2 testing, as they have little impact of core requirements such as speech quality and robustness.
-\begin{itemize}
+\begin{enumerate}
+\item Reduce acquisition time for benign channels.
 \item Improved EOO performance at lower SNRs.
-\item SNR estimator.
-\item Streaming text.
-\item Extend range of frequency offset estimation.
-\end{itemize}
+\item Completion of streaming text feature by addition of external library for framing and error correction of 25 bits/s BPSK symbol stream.
+\item Extend range of frequency offset estimation to $\pm 50 \si{Hz}$.
+\item Write a ``type approval" procedure to allow 3rd parties to verify their integration of RADE V2.
+\end{enumerate}
 
 \end{document}
