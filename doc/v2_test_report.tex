@@ -95,8 +95,8 @@ The FreeDV Project Leadership Team and many others have helped with support and 
 \centering
 \begin{tabular}{ l | l }
  \hline
-  Date  & From 5-26 Feb 2026 \\
-  Git Hash & 7a558 26 Feb \\
+  Date  & Feb-Mar 2026 \\
+  Git Hash & 3e06b6 8 April 2026 \\
   ML encoder/decoder & 250725 \\
   ML sync & 250725a\_ml\_sync \\
  \hline
@@ -387,11 +387,37 @@ Sample command line:
 ./test/snr_est_test.sh --channel mpp | tee snr_est_mpp.txt
 \end{verbatim}
 
+\subsection{Streaming Text}
+
+The RADE V2 waveform provides a 1 BPSK symbol/frame (25 bit/s) for auxiliary text information such as callsign and grid square.  At the stage of writing this report this feature is incomplete, as no library for framing and error correction exists.  Table \ref{tab:bpsk_ber} presents the uncoded BER performance of the BPSK bit stream.  The 49 second wave file \emph{all.wav} was used for the source speech (1400 bits total).
+ 
+\begin{table} [h]
+\caption{BPSK bit error rate (BER) for various channels}
+\label{tab:bpsk_ber}
+\centering
+\begin{tabular}{ c | c | r | r }
+ \hline
+ Channel & EbNodB & SNR (\si{dB}) & BER \\
+ \hline
+ AWGN & 100 & 100 & 0.00 \\
+ AWGN & 10 & 3.5 & 0.01 \\
+ AWGN & 6 & -0.5 & 0.047 \\
+ AWGN & 3 & -3.5 & 0.103 \\
+ MPP & 100 & 100 & 0.005 \\
+ MPP & 10 & 4.5 & 0.035 \\
+ MPP & 6 & -0.5 & 0.086 \\
+ MPP & 3 & -3.4 & 0.136 \\
+ \hline
+\end{tabular}
+\end{table}
+
+A modern FEC code will be able to correct errors in the several percent range and break down at about 10\% BER. This suggests reliable text transfer can occur to around -3 \si{dB} on AWGN channels and 0 \si{dB} on fading channels.  It is acceptable if text transfer breaks down at very low SNRs, as we would prefer to prioritise speech at low SNRs. The text information tends to be repeated, so it is not necessary to receive every encoded text frame, even an occasional decode of a text frame would be acceptable over a several minute over. 
+
 \subsection{Initial Over the Air Tests}
 
 This section describes initial OTA tests using the stored file test system implemented by the script \emph{ota\_test.sh}.  The purpose of these tests was (a) see if RADE V2 actually works over real world HF channels (b) compare V2 to RADE V1 to determine if there is any improvement at low and high SNRs.  The simulated results presented above predict a 3 dB increase in sensitivity at low SNRs.  At high SNRs the ML network “loss” is significantly lower for V2, but we are not sure what that means in terms of speech quality.
 
-The \emph{ota\_test.sh} script generates a file consisting of a chirp – SSB RADE V1 – RADE V2 in sequence. This was transmitted from the authors home station (IC7200 transmitter) to various KiwiSDRs around Australia.  The chirp is used to estimate SNR of the channel, and SSB and RADE V1 are included for comparison. By sending all 4 signals at approximately the same time, we have them passing over roughly the same HF channel. In addition, several tests were conducted "Over The Cable" (OTC)- using a local (FT817) receiver connected to the transmitter via attenuators and cable - providing a ``perfect" channel.  A total of 17 test were performed during March 2026. In each case RADE V2 worked well on real HF channels, supporting the functional test aim (a) above.
+The \emph{ota\_test.sh} script generates a file consisting of a chirp – SSB RADE V1 – RADE V2 in sequence. This was transmitted from the authors home station (IC7200 transmitter) to various KiwiSDRs around Australia.  The chirp is used to estimate SNR of the channel, and SSB and RADE V1 are included for comparison. By sending all 4 signals at approximately the same time, we have them passing over roughly the same HF channel. In addition, several tests were conducted "Over The Cable" (OTC) - using a local (FT817) receiver connected to the transmitter via attenuators and cable - providing a ``perfect" channel.  A total of 17 test were performed during March 2026. In each case RADE V2 worked well on real HF channels, supporting the functional test aim (a) above.
 
 Selected speech samples are available \href{https://freedv.org/david-march-2026-ai-v1-c-port-qa-claude-code-v2-eoo-and-snr-stored-file-ota-tests/}{here}.
 
