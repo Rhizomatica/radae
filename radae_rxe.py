@@ -55,7 +55,7 @@ uw_error_thresh = 7 # P(reject|correct) = 1 -  binocdf(8,24,0.1) = 4.5E-4
 
 class radae_rx:
    def __init__(self, model_name, latent_dim = 80, auxdata = True, bottleneck = 3, bpf_en=True, v=2, 
-                disable_unsync=False, foff_err=0, bypass_dec=False, eoo_data_test=False):
+                disable_unsync=False, foff_err=0, bypass_dec=False, eoo_data_test=False, w1_dec=128):
 
       self.latent_dim = latent_dim
       self.auxdata = auxdata
@@ -73,11 +73,32 @@ class radae_rx:
       if self.auxdata:
          self.num_features += 1
 
+      # Auto-detect architecture from checkpoint weights before constructing model
+      checkpoint = None
+      if not self.bypass_dec:
+         checkpoint = torch.load(model_name, map_location='cpu', weights_only=True)
+         sd = checkpoint['state_dict']
+         if 'core_encoder.module.z_dense.weight' in sd:
+            latent_dim = sd['core_encoder.module.z_dense.weight'].shape[0]
+         if 'core_decoder.module.dense_1.weight' in sd:
+            w1_dec = sd['core_decoder.module.dense_1.weight'].shape[0]
+         if 'core_encoder.module.dense_1.weight' in sd:
+            self.num_features = sd['core_encoder.module.dense_1.weight'].shape[1] // 4
+         self.latent_dim = latent_dim
+         if checkpoint is not None and self.v >= 3:
+            print(f"radae_rx: checkpoint detected: latent_dim={self.latent_dim} w1_dec={w1_dec} num_features={self.num_features}", file=sys.stderr)
+
       self.model = RADAE(self.num_features, latent_dim, EbNodB=100, rate_Fs=True, 
                         pilots=True, pilot_eq=True, eq_mean6 = False, cyclic_prefix=0.004,
-                        coarse_mag=True,time_offset=-16, bottleneck=bottleneck)
+                        coarse_mag=True,time_offset=-16, bottleneck=bottleneck, w1_dec=w1_dec)
       model = self.model
       self.model.eval()
+
+      if self.v >= 3:
+         try:
+            print(f"radae_rx: constructed model: Nzmf={model.Nzmf} enc_stride={model.enc_stride} dec_stride={model.dec_stride} Nseoo={model.Nseoo}", file=sys.stderr)
+         except Exception:
+            print("radae_rx: constructed model (failed to read some attributes)", file=sys.stderr)
 
       # check a bunch of model options we rely on for receiver to work
       assert self.model.pilots and model.pilot_eq
@@ -110,12 +131,15 @@ class radae_rx:
 
       self.acq = acquisition(Fs,Rs,M,Ncp,Nmf,p,model.pend)
 
-      if not self.bypass_dec:
-         # load model from a checkpoint file
-         checkpoint = torch.load(model_name, map_location='cpu',weights_only=True)
+      if checkpoint is not None:
          model.load_state_dict(checkpoint['state_dict'], strict=False)
-         # Stateful decoder wasn't present during training, so we need to load weights from existing decoder
-         model.core_decoder_statefull_load_state_dict()
+         # Only copy decoder weights to stateful decoder if stateful decoder weights
+         # are not already in the checkpoint (they may differ in architecture)
+         has_statefull_decoder = any(k.startswith('core_decoder_statefull') for k in checkpoint['state_dict'])
+         if not has_statefull_decoder:
+            model.core_decoder_statefull_load_state_dict()
+         if self.v >= 3:
+            print("radae_rx: loaded checkpoint into model", file=sys.stderr)
 
       # number of output floats per processing frame
       if not self.bypass_dec:
@@ -191,6 +215,10 @@ class radae_rx:
          endofover = False
          uw_fail = False
          buffer_complex = buffer_complex[:self.nin]
+         if self.v >= 3:
+            tmax = getattr(self, 'tmax', -999)
+            fmax = getattr(self, 'fmax', -999)
+            print(f"do_radae_rx: nin={self.nin} Nmf={Nmf} Fs={Fs} state={self.state} tmax={tmax} fmax={fmax}", file=sys.stderr)
          if self.bpf_en:
             buffer_complex = bpf.bpf(buffer_complex)
          rx_buf[:-self.nin] = rx_buf[self.nin:]                      # out with the old
@@ -234,6 +262,11 @@ class radae_rx:
 
             # run through RADAE receiver DSP
             z_hat = receiver.receiver_one(rx, endofover)
+            if self.v >= 3:
+               try:
+                  print(f"receiver.receiver_one -> z_hat.shape={z_hat.shape} endofover={endofover}", file=sys.stderr)
+               except Exception:
+                  print("receiver.receiver_one -> z_hat (unable to read shape)", file=sys.stderr)
             valid_output = not endofover
                
          if v == 2 or (v == 1 and (self.state == "search" or self.state == "candidate" or prev_state == "candidate")):
@@ -302,11 +335,18 @@ class radae_rx:
             if not self.bypass_dec:
                # decode z_hat to features
                features_hat = model.core_decoder_statefull(z_hat)
+               if self.v >= 3:
+                  try:
+                     print(f"core_decoder_statefull -> features_hat.shape={features_hat.shape}", file=sys.stderr)
+                  except Exception:
+                     print("core_decoder_statefull -> features_hat (unable to read shape)", file=sys.stderr)
                if auxdata:
                   symb_repeat = 4
                   aux_symb = features_hat[:,:,20].detach().numpy()
                   aux_bits = 1*(aux_symb[0,::symb_repeat] > 0)
                   #print(aux_symb,aux_symb[0,::symb_repeat],aux_bits,file=sys.stderr)
+                  if self.v >= 3:
+                     print(f"auxdata: sampled aux_bits sum={np.sum(aux_bits)}", file=sys.stderr)
 
                   features_hat = features_hat[:,:,0:20]
                   self.sum_uw_errors(np.sum(aux_bits))
@@ -314,6 +354,12 @@ class radae_rx:
                # add unused features and output
                features_hat = torch.cat([features_hat, torch.zeros_like(features_hat)[:,:,:16]], dim=-1)
                features_hat = features_hat.cpu().detach().numpy().flatten().astype('float32')
+               if self.v >= 3:
+                  try:
+                     sample_out = features_hat[:8].tolist()
+                     print(f"output features len={len(features_hat)} sample[:8]={sample_out}", file=sys.stderr)
+                  except Exception:
+                     print("output features produced (unable to sample)", file=sys.stderr)
                np.copyto(floats_out, features_hat)
             else:
                np.copyto(floats_out, z_hat.cpu().detach().numpy().flatten().astype('float32'))
@@ -339,12 +385,13 @@ if __name__ == '__main__':
    parser.add_argument('--foff_err', type=float, default=0.0, help='Artifical freq offset error after first sync to test false sync (default 0.0)')
    parser.add_argument('--bypass_dec', action='store_true', help='Bypass core decoder, write z_hat to stdout')
    parser.add_argument('--eoo_data_test', action='store_true', help='experimental EOO data test - count bit errors')
+   parser.add_argument('--w1_dec', type=int, default=128, help='Decoder GRU output dimension (default 128)')
    parser.set_defaults(auxdata=True)
    parser.set_defaults(use_stdout=True)
    args = parser.parse_args()
 
    rx = radae_rx(args.model_name,auxdata=args.auxdata,v=args.v,disable_unsync=args.disable_unsync,foff_err=args.foff_err, 
-                 bypass_dec=args.bypass_dec,eoo_data_test=args.eoo_data_test)
+                 bypass_dec=args.bypass_dec,eoo_data_test=args.eoo_data_test,w1_dec=args.w1_dec)
 
    # allocate storage for output features
    floats_out = np.zeros(rx.get_n_floats_out(),dtype=np.float32)

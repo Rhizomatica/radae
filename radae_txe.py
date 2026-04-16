@@ -45,29 +45,53 @@ nb_total_features = 36
 num_used_features = 20
 
 class radae_tx:
-   def __init__(self, model_name, latent_dim=80, auxdata=True, bottleneck=3, txbpf_en=False, bypass_enc=False):
+   def __init__(self, model_name, latent_dim=80, auxdata=True, bottleneck=3, txbpf_en=False, bypass_enc=False, w1_dec=128, v=2):
 
       self.latent_dim = latent_dim
       self.auxdata = auxdata
       self.bottleneck = bottleneck
       self.txbpf_en = txbpf_en
       self.bypass_enc = bypass_enc
-      print(f"model_name: {model_name} bypass_enc: {bypass_enc}", file=sys.stderr)
+      self.v = v
+      print(f"model_name: {model_name} bypass_enc: {bypass_enc} v={v}", file=sys.stderr)
 
       self.num_features = 20
       if auxdata:
          self. num_features += 1
 
+      # Auto-detect architecture from checkpoint weights before constructing model
+      checkpoint = None
+      if not self.bypass_enc:
+         checkpoint = torch.load(model_name, map_location='cpu', weights_only=True)
+         sd = checkpoint['state_dict']
+         if 'core_encoder.module.z_dense.weight' in sd:
+            latent_dim = sd['core_encoder.module.z_dense.weight'].shape[0]
+         if 'core_decoder.module.dense_1.weight' in sd:
+            w1_dec = sd['core_decoder.module.dense_1.weight'].shape[0]
+         if 'core_encoder.module.dense_1.weight' in sd:
+            self.num_features = sd['core_encoder.module.dense_1.weight'].shape[1] // 4
+         self.latent_dim = latent_dim
+         if checkpoint is not None and self.v >= 3:
+            print(f"radae_tx: checkpoint detected: latent_dim={self.latent_dim} w1_dec={w1_dec} num_features={self.num_features}", file=sys.stderr)
+
       self.model = RADAE(self.num_features, latent_dim, EbNodB=100, rate_Fs=True, 
                   pilots=True, pilot_eq=True, eq_mean6 = False, cyclic_prefix=0.004,
-                  coarse_mag=True,time_offset=-16, bottleneck=bottleneck)
+                  coarse_mag=True,time_offset=-16, bottleneck=bottleneck, w1_dec=w1_dec)
       model = self.model
-      if not self.bypass_enc:
-         # load model from a checkpoint file
-         checkpoint = torch.load(model_name, map_location='cpu', weights_only=True)
+      if checkpoint is not None:
          model.load_state_dict(checkpoint['state_dict'], strict=False)
-         model.core_encoder_statefull_load_state_dict()
+         # Only copy encoder weights to stateful encoder if stateful encoder weights
+         # are not already in the checkpoint (they may differ in architecture)
+         has_statefull_encoder = any(k.startswith('core_encoder_statefull') for k in checkpoint['state_dict'])
+         if not has_statefull_encoder:
+            model.core_encoder_statefull_load_state_dict()
       model.eval()
+
+      if self.v >= 3:
+         try:
+            print(f"radae_tx: constructed model: enc_stride={model.enc_stride} Nzmf={model.Nzmf} nb_total_features={nb_total_features} num_used_features={num_used_features} auxdata={self.auxdata}", file=sys.stderr)
+         except Exception:
+            print("radae_tx: constructed model (unable to read some attributes)", file=sys.stderr)
 
       self.transmitter = transmitter_one(model.latent_dim,model.enc_stride,model.Nzmf,model.Fs,model.M,model.Ncp,
                                          model.Winv,model.Nc,model.Ns,model.w,model.P,model.bottleneck,model.pilot_gain)
@@ -110,23 +134,43 @@ class radae_tx:
       num_timesteps_at_rate_Rs = model.num_timesteps_at_rate_Rs(model.Nzmf*model.enc_stride)
 
       with torch.inference_mode():
+            if self.v >= 3:
+               expected = model.Nzmf*model.enc_stride*nb_total_features if not self.bypass_enc else model.Nzmf*self.latent_dim
+               print(f"do_radae_tx: buffer len={len(buffer_f32)} expected={expected} bypass_enc={self.bypass_enc}", file=sys.stderr)
          if not self.bypass_enc:
             features = torch.reshape(torch.tensor(buffer_f32),(1,model.Nzmf*model.enc_stride, nb_total_features))
             features = features[:,:,:num_used_features]
+               if self.v >= 3:
+                  print(f"features reshaped {features.shape} num_used_features={num_used_features}", file=sys.stderr)
             if self.auxdata:
                aux_symb =  -torch.ones((1,features.shape[1],1))
                symb_repeat = 4
                for i in range(1,symb_repeat):
                   aux_symb[0,i::symb_repeat,:] = aux_symb[0,::symb_repeat,:]
                features = torch.concatenate([features, aux_symb],axis=2)
+                  if self.v >= 3:
+                     try:
+                        print(f"aux_symb shape {aux_symb.shape} sample_first={aux_symb[0,0,0].item()}", file=sys.stderr)
+                     except Exception:
+                        print("aux_symb created", file=sys.stderr)
             #print(features.shape, file=sys.stderr)
             z = model.core_encoder_statefull(features)
+               if self.v >= 3:
+                  try:
+                     print(f"z shape {z.shape}", file=sys.stderr)
+                  except Exception:
+                     print("z produced", file=sys.stderr)
          else:
             #print("Using external core encoder", file=sys.stderr)
             z = torch.reshape(torch.tensor(buffer_f32),(1,model.Nzmf,self.latent_dim))      
          #print(z.shape, file=sys.stderr)
          tx = self.transmitter.transmitter_one(z,num_timesteps_at_rate_Rs)
          tx = tx.cpu().detach().numpy().flatten().astype('csingle')
+            if self.v >= 3:
+               try:
+                  print(f"tx produced {tx.shape[0]} samples sample[:8]={tx[:8]}", file=sys.stderr)
+               except Exception:
+                  print("tx produced (unable to sample)", file=sys.stderr)
          if self.txbpf_en:
             tx = self.txbpf.bpf(tx)
             tx = np.clip(abs(tx),a_min=0, a_max=1)*np.exp(1j*np.angle(tx))
@@ -150,9 +194,11 @@ if __name__ == '__main__':
    parser.add_argument('--txbpf', action='store_true', help='enable Tx BPF')
    parser.add_argument('--bypass_enc', action='store_true', help='Bypass core encoder, read z from stdin')
    parser.add_argument('--eoo_data_test', action='store_true', help='experimental EOO data test - tx test frame')
+   parser.add_argument('--w1_dec', type=int, default=128, help='Decoder GRU output dimension (default 128)')
    parser.set_defaults(auxdata=True)
+   parser.add_argument('-v', type=int, default=2, help='Verbose level (default 2)')
    args = parser.parse_args()
-   tx = radae_tx(model_name=args.model_name, auxdata=args.auxdata, txbpf_en=args.txbpf, bypass_enc=args.bypass_enc)
+   tx = radae_tx(model_name=args.model_name, auxdata=args.auxdata, txbpf_en=args.txbpf, bypass_enc=args.bypass_enc, w1_dec=args.w1_dec, v=args.v)
    
    if args.eoo_data_test:
       # create a RNG with same sequence for BER testing with separate tx and rx
