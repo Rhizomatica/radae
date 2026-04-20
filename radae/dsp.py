@@ -52,8 +52,11 @@ class complex_bpf():
       assert np.all(self.h == np.flip(self.h))
 
       # Preallocate memory needed for BPF
+      # Note: in steady state self.mem holds Ntap+1 samples (see bpf() end),
+      # so x_mem must be sized for max_len + (Ntap+1) to avoid a
+      # "wrong shape" np.concatenate error when nin grows on timing-slip.
       self.mem = np.zeros(self.Ntap-1, dtype=np.complex64)
-      self.x_mem = np.zeros(self.Ntap + max_len - 1, dtype=np.complex64)
+      self.x_mem = np.zeros(self.Ntap + max_len + 1, dtype=np.complex64)
       self.x_filt = np.zeros(max_len, dtype=np.complex64)
       self.n = max_len
 
