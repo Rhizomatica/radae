@@ -34,9 +34,11 @@
 
 */
 
-#define VERSION 1  // bump me every time API changes
+#define VERSION 2  // bump me every time API changes
 
 #include <assert.h>
+#include <math.h>
+#include <string.h>
 #include "rade_api.h"
 
 #define PY_SSIZE_T_CLEAN
@@ -52,10 +54,19 @@
 #include "rade_enc_data.h"
 #include "rade_dec.h"
 #include "rade_dec_data.h"
+#include "complex_bpf.h"
+#include "rx2_model_data.h"
+#include "rx2_receiver.h"
 
 static PyThreadState* main_thread_state; // needed to unlock the GIL after initialization
 
+enum rade_backend {
+  RADE_BACKEND_LEGACY = 0,
+  RADE_BACKEND_RX_V2_PURE_C = 1
+};
+
 struct rade {
+  int backend;
   int flags;
   int auxdata;
   int nb_total_features;
@@ -87,7 +98,19 @@ struct rade {
   npy_intp n_floats_out;
   float *floats_out;
   RADE_COMP *rx_in;
+  float freq_offset;
+  struct complex_bpf rx2_bpf;
+  int rx2_bpf_en;
+  RADE_COMP *rx2_bpf_out;
+  struct rx2_receiver rx2_receiver;
 };
+
+static void rade_set_common_feature_meta(struct rade *r) {
+  r->auxdata = 1;
+  r->nb_total_features = 36;
+  r->num_used_features = 20;
+  r->num_features = r->num_used_features + r->auxdata;
+}
 
 
 void check_error(PyObject *p, char s1[], char s2[]) {
@@ -225,14 +248,14 @@ int rade_tx_open(struct rade *r) {
 
 void rade_tx_close(struct rade *r) {
   // TODO we may need more of these, see if there are any memory leaks
-  Py_DECREF(r->pArgs_radae_tx);
-  Py_DECREF(r->pMeth_radae_tx);
-  Py_DECREF(r->pMeth_radae_tx_eoo);
-  Py_DECREF(r->pArgs_radae_tx_eoo);
-  Py_DECREF(r->pMeth_radae_set_eoo_bits);
-  Py_DECREF(r->pArgs_radae_set_eoo_bits);
-  Py_DECREF(r->pInst_radae_tx);
-  Py_DECREF(r->pModule_radae_tx);
+  Py_XDECREF(r->pArgs_radae_tx);
+  Py_XDECREF(r->pMeth_radae_tx);
+  Py_XDECREF(r->pMeth_radae_tx_eoo);
+  Py_XDECREF(r->pArgs_radae_tx_eoo);
+  Py_XDECREF(r->pMeth_radae_set_eoo_bits);
+  Py_XDECREF(r->pArgs_radae_set_eoo_bits);
+  Py_XDECREF(r->pInst_radae_tx);
+  Py_XDECREF(r->pModule_radae_tx);
 
   free(r->floats_in);
   free(r->tx_out);
@@ -316,11 +339,11 @@ int rade_rx_open(struct rade *r) {
 }
 
 void rade_rx_close(struct rade *r) {
-  Py_DECREF(r->pArgs_radae_rx);
-  Py_DECREF(r->pMeth_radae_rx);
-  Py_DECREF(r->pMeth_sum_uw_errors);
-  Py_DECREF(r->pInst_radae_rx);
-  Py_DECREF(r->pModule_radae_rx);
+  Py_XDECREF(r->pArgs_radae_rx);
+  Py_XDECREF(r->pMeth_radae_rx);
+  Py_XDECREF(r->pMeth_sum_uw_errors);
+  Py_XDECREF(r->pInst_radae_rx);
+  Py_XDECREF(r->pModule_radae_rx);
 
   free(r->floats_out);
   free(r->rx_in);
@@ -341,8 +364,9 @@ void rade_finalize(void) {
 
 struct rade *rade_open(char model_file[], int flags) {
   int ret;
-  struct rade *r = (struct rade*)malloc(sizeof(struct rade));
+  struct rade *r = (struct rade*)calloc(1, sizeof(struct rade));
   assert(r != NULL);
+  r->backend = RADE_BACKEND_LEGACY;
   r->flags = flags;
 
   // Acquire the Python GIL (needed for multithreaded use)
@@ -355,11 +379,7 @@ struct rade *rade_open(char model_file[], int flags) {
   ret = _import_array();
   fprintf(stderr, "import_array returned: %d\n", ret);
   
-  // TODO a better way of handling these constants, e.g. read from model
-  r->auxdata = 1;
-  r->nb_total_features = 36;
-  r->num_used_features = 20;
-  r->num_features = r->num_used_features + r->auxdata;     
+  rade_set_common_feature_meta(r);
 
   rade_tx_open(r);
   rade_rx_open(r);
@@ -371,15 +391,88 @@ struct rade *rade_open(char model_file[], int flags) {
   return r;
 }
 
+struct rade *rade_rx_v2_pure_c_open(const char model_file[],
+                                    const char frame_sync_model_file[],
+                                    int flags) {
+  struct rade *r = (struct rade*)calloc(1, sizeof(struct rade));
+  struct rx2_receiver_config cfg;
+  float B_bpf;
+
+  (void)model_file;
+  (void)frame_sync_model_file;
+
+  assert(r != NULL);
+  r->backend = RADE_BACKEND_RX_V2_PURE_C;
+  r->flags = flags | RADE_USE_C_DECODER;
+  rade_set_common_feature_meta(r);
+
+  B_bpf = 1.2f * (rx2_model_w[RX2_MODEL_NC - 1] - rx2_model_w[0]) * RX2_MODEL_FS / (2.0f * (float)M_PI);
+  memset(&cfg, 0, sizeof(cfg));
+  cfg.M = RX2_MODEL_M;
+  cfg.Ncp = RX2_MODEL_NCP;
+  cfg.Ns = RX2_MODEL_NS;
+  cfg.Nc = RX2_MODEL_NC;
+  cfg.Fs = RX2_MODEL_FS;
+  cfg.B_bpf = B_bpf;
+  cfg.time_offset = RX2_MODEL_TIME_OFFSET;
+  cfg.correct_time_offset = RX2_MODEL_CORRECT_TIME_OFFSET;
+  cfg.auxdata = r->auxdata;
+  cfg.limit_pitch = 1;
+  cfg.mute = 1;
+  cfg.agc = 1;
+  cfg.hangover = 75;
+  cfg.timing_adj_at = 16;
+  cfg.reset_output_on_resync = 0;
+  cfg.w = rx2_model_w;
+  cfg.pend = rx2_model_pend;
+  if (rx2_receiver_init(&r->rx2_receiver, &cfg) != 0) {
+    free(r);
+    return NULL;
+  }
+
+  r->n_features_in = r->nb_total_features * RADE_FRAMES_PER_STEP;
+  r->n_features_out = r->n_features_in;
+  r->n_floats_out = r->n_features_out;
+  r->n_eoo_bits = 0;
+  r->Nmf = 0;
+  r->Neoo = 0;
+  r->nin = r->rx2_receiver.sym_len;
+  r->nin_max = r->rx2_receiver.max_nin;
+  r->sync = 0;
+  r->snr = 0;
+  r->freq_offset = 0.0f;
+  r->rx2_bpf_en = 1;
+  r->rx2_bpf_out = (RADE_COMP *)malloc(sizeof(*r->rx2_bpf_out) * r->nin_max);
+  assert(r->rx2_bpf_out != NULL);
+  if (complex_bpf_init(&r->rx2_bpf, 101, RX2_MODEL_FS, B_bpf,
+                       (rx2_model_w[RX2_MODEL_NC - 1] + rx2_model_w[0]) * RX2_MODEL_FS / (4.0f * (float)M_PI),
+                       r->nin_max) != 0) {
+    free(r->rx2_bpf_out);
+    rx2_receiver_destroy(&r->rx2_receiver);
+    free(r);
+    return NULL;
+  }
+
+  return r;
+}
+
 void rade_close(struct rade *r) {
-  // Acquire the Python GIL (needed for multithreaded use)
-  PyGILState_STATE gstate = PyGILState_Ensure();
+  if (!r) return;
+  if (r->backend == RADE_BACKEND_LEGACY) {
+    // Acquire the Python GIL (needed for multithreaded use)
+    PyGILState_STATE gstate = PyGILState_Ensure();
 
-  rade_tx_close(r);
-  rade_rx_close(r);
+    rade_tx_close(r);
+    rade_rx_close(r);
 
-  // Release Python GIL
-  PyGILState_Release(gstate);
+    // Release Python GIL
+    PyGILState_Release(gstate);
+  } else if (r->backend == RADE_BACKEND_RX_V2_PURE_C) {
+    complex_bpf_destroy(&r->rx2_bpf);
+    free(r->rx2_bpf_out);
+    rx2_receiver_destroy(&r->rx2_receiver);
+  }
+  free(r);
 }
 
 int rade_version(void) { return VERSION; }
@@ -392,6 +485,7 @@ int rade_n_eoo_bits(struct rade *r) { assert(r != NULL);  return r->n_eoo_bits; 
 
 RADE_EXPORT void rade_tx_set_eoo_bits(struct rade *r, float eoo_bits[]) {
   assert(r != NULL);
+  assert(r->backend == RADE_BACKEND_LEGACY);
   assert(eoo_bits != NULL);
   PyGILState_STATE gstate = PyGILState_Ensure();
   fprintf(stderr, "n_eoo_bits: %ld\n", r->n_eoo_bits);
@@ -402,6 +496,7 @@ RADE_EXPORT void rade_tx_set_eoo_bits(struct rade *r, float eoo_bits[]) {
 
 int rade_tx(struct rade *r, RADE_COMP tx_out[], float floats_in[]) {
   assert(r != NULL);
+  assert(r->backend == RADE_BACKEND_LEGACY);
   assert(floats_in != NULL);
   assert(tx_out != NULL);
 
@@ -446,6 +541,7 @@ int rade_tx(struct rade *r, RADE_COMP tx_out[], float floats_in[]) {
 
 int rade_tx_eoo(struct rade *r, RADE_COMP tx_eoo_out[]) {
   assert(r != NULL);
+  assert(r->backend == RADE_BACKEND_LEGACY);
   assert(tx_eoo_out != NULL);
 
   // Acquire the Python GIL (needed for multithreaded use)
@@ -460,11 +556,56 @@ int rade_tx_eoo(struct rade *r, RADE_COMP tx_eoo_out[]) {
   return r->Neoo;
 }
 
+int rade_rx_v2_pure_c(struct rade *r, float features_out[], int *has_eoo_out, float eoo_out[], RADE_COMP rx_in[]) {
+  struct rx2_receiver_step step;
+  float raw_features[RADE_FRAMES_PER_STEP * 21];
+  const RADE_COMP *rx_step = rx_in;
+  (void)eoo_out;
+
+  assert(r != NULL);
+  assert(r->backend == RADE_BACKEND_RX_V2_PURE_C);
+  assert(features_out != NULL);
+  assert(has_eoo_out != NULL);
+  assert(rx_in != NULL);
+
+  memset(features_out, 0, sizeof(float) * r->n_features_out);
+  *has_eoo_out = 0;
+
+  if (r->rx2_bpf_en) {
+    if (complex_bpf_process(&r->rx2_bpf, (const COMP *)rx_in, (int)r->nin, (COMP *)r->rx2_bpf_out) != 0) {
+      return 0;
+    }
+    rx_step = r->rx2_bpf_out;
+  }
+  if (rx2_receiver_process(&r->rx2_receiver, (const COMP *)rx_step, (int)r->nin, raw_features, &step) != 0) {
+    return 0;
+  }
+
+  r->nin = step.next_nin;
+  r->sync = r->rx2_receiver.state == RX2_RECEIVER_SYNC;
+  r->snr = (int)r->rx2_receiver.coarse_sync.snr_est_dB;
+  r->freq_offset = r->rx2_receiver.freq_offset;
+
+  if (step.decoded_valid) {
+    for (int i = 0; i < RADE_FRAMES_PER_STEP; i++) {
+      memcpy(&features_out[i * r->nb_total_features],
+             &raw_features[i * r->num_features],
+             sizeof(float) * r->num_features);
+    }
+    return r->n_features_out;
+  }
+  return 0;
+}
+
 int rade_rx(struct rade *r, float features_out[], int *has_eoo_out, float eoo_out[], RADE_COMP rx_in[]) {
   PyObject *pValue;
   assert(r != NULL);
   assert(features_out != NULL);
   assert(rx_in != NULL);
+
+  if (r->backend == RADE_BACKEND_RX_V2_PURE_C) {
+    return rade_rx_v2_pure_c(r, features_out, has_eoo_out, eoo_out, rx_in);
+  }
 
   // Acquire the Python GIL (needed for multithreaded use)
   PyGILState_STATE gstate = PyGILState_Ensure();
@@ -546,6 +687,8 @@ int rade_sync(struct rade *r) {
 // TODO: we need a float getter
 float rade_freq_offset(struct rade *r) {
   assert(r != NULL);
+  if (r->backend == RADE_BACKEND_RX_V2_PURE_C)
+    return r->freq_offset;
   return 0;
 }
 
