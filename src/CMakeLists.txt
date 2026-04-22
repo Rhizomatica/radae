@@ -51,6 +51,12 @@ target_link_libraries(test_rx2_frontend m)
 
 add_executable(test_rx2_coarse_sync test_rx2_coarse_sync.c rx2_coarse_sync.c)
 target_link_libraries(test_rx2_coarse_sync m)
+
+add_executable(test_rx2_demod test_rx2_demod.c rx2_demod.c)
+target_link_libraries(test_rx2_demod m)
+
+add_executable(test_rx2_eoo test_rx2_eoo.c rx2_eoo.c)
+target_link_libraries(test_rx2_eoo m)
 endif (NOT WIN32)
 
 add_executable(write_rade_weights write_rade_weights.c)
