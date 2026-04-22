@@ -60,6 +60,20 @@ target_link_libraries(test_rx2_eoo m)
 
 add_executable(test_rx2_frame_sync test_rx2_frame_sync.c rx2_frame_sync.c frame_sync.c frame_sync_data.c rade_dec.c rade_dec_data.c)
 target_link_libraries(test_rx2_frame_sync opus m)
+
+add_executable(test_rx2_receiver
+    test_rx2_receiver.c
+    rx2_receiver.c
+    rx2_frontend.c
+    rx2_coarse_sync.c
+    rx2_demod.c
+    rx2_eoo.c
+    rx2_frame_sync.c
+    frame_sync.c
+    frame_sync_data.c
+    rade_dec.c
+    rade_dec_data.c)
+target_link_libraries(test_rx2_receiver opus m)
 endif (NOT WIN32)
 
 add_executable(write_rade_weights write_rade_weights.c)
