@@ -41,6 +41,60 @@ from radae import RADAE,complex_bpf
 from models_sync import FrameSyncNet
 
 
+class ComfortNoiseGenerator:
+   HOLD_OUTPUTS = 50
+
+   def __init__(self, dec_stride, num_features, auxdata, enabled=True):
+      self.enabled = enabled
+      self.dec_stride = dec_stride
+      self.num_features = num_features
+      self.auxdata = auxdata
+      self.emit_parity = 0
+      self.remaining_outputs = 0
+      self.rng = np.random.default_rng()
+      self.profile = np.zeros((dec_stride, num_features), dtype=np.float32)
+      self.profile[:, 0] = -5.0
+      self.profile[:, 18] = -1.4
+      self.profile[:, 19] = -1.0
+
+   def update(self, features_hat_slice, symbol_count):
+      frames = features_hat_slice.detach().cpu().numpy()[0].astype(np.float32)
+      target = np.array(frames, copy=True)
+      target[:, 0] = np.clip(np.minimum(target[:, 0] - 2.0, -4.0), -6.0, -4.0)
+      target[:, 18] = -1.4
+      target[:, 19] = -1.0
+      if self.auxdata and target.shape[1] > 20:
+         target[:, 20] = 0.0
+      self.profile = (0.96 * self.profile + 0.04 * target).astype(np.float32)
+      self.emit_parity = symbol_count & 1
+      self.remaining_outputs = self.HOLD_OUTPUTS
+
+   def should_emit(self, symbol_count):
+      if not self.enabled:
+         return False
+      if self.remaining_outputs <= 0:
+         return False
+      return (symbol_count & 1) == self.emit_parity
+
+   def generate(self):
+      frames = np.array(self.profile, copy=True)
+      frames[:, 0] = np.clip(
+         frames[:, 0] + 0.08 * self.rng.standard_normal(self.dec_stride),
+         -6.0, -3.8
+      )
+      frames[:, 1:6] += 0.02 * self.rng.standard_normal((self.dec_stride, 5))
+      frames[:, 18] = -1.4
+      frames[:, 19] = np.clip(
+         -0.92 + 0.03 * self.rng.standard_normal(self.dec_stride),
+         -1.0, -0.75
+      )
+      if self.auxdata and frames.shape[1] > 20:
+         frames[:, 20] = 0.0
+      if self.remaining_outputs > 0:
+         self.remaining_outputs -= 1
+      return frames.astype(np.float32)
+
+
 class RADEv2Receiver:
    """RADE V2 acquisition and frame sync state machine.
 
@@ -402,6 +456,8 @@ if __name__ == '__main__':
     parser.add_argument('--nolimit_pitch', action='store_false', dest='limit_pitch', help='disable limiting (clip) lower end of pitch feature to prevent synthesis pops with some speakers/channels (default enabled)')
     parser.set_defaults(mute=False)
     parser.add_argument('--mute', action='store_false',  dest='mute', help='enable mute when sig lost (default disabled)')
+    parser.set_defaults(comfort_noise=True)
+    parser.add_argument('--no_comfort_noise', action='store_false', dest='comfort_noise', help='disable comfort-noise output when no valid decode is available')
     args = parser.parse_args()
 
     # make sure we don't use a GPU
@@ -489,6 +545,8 @@ if __name__ == '__main__':
     print(sequence_length, file=sys.stderr)
 
     receiver = RADEv2Receiver(model, frame_sync_nn, args)
+    comfort_noise = ComfortNoiseGenerator(model.dec_stride, num_features,
+                                          args.auxdata, args.comfort_noise)
     z_hat        = torch.zeros((1, sequence_length, model.latent_dim), dtype=torch.float32)
     features_hat = torch.zeros((1, sequence_length * model.dec_stride, num_features))
 
@@ -537,10 +595,18 @@ if __name__ == '__main__':
        receiver.state = next_state
 
        if features_hat_slice is not None:
+          comfort_noise.update(features_hat_slice, receiver.s)
           z_hat[0, receiver.i, :] = receiver.az_hat
           dec_st = receiver.model.dec_stride * receiver.i
           dec_en = receiver.model.dec_stride * (receiver.i + 1)
           features_hat[0, dec_st:dec_en, :] = features_hat_slice
+          receiver.i += 1
+       elif comfort_noise.should_emit(receiver.s):
+          dec_st = receiver.model.dec_stride * receiver.i
+          dec_en = receiver.model.dec_stride * (receiver.i + 1)
+          features_hat[0, dec_st:dec_en, :] = torch.from_numpy(
+             comfort_noise.generate()
+          )
           receiver.i += 1
 
        if receiver.s > receiver.args.timing_adj_at:

@@ -43,7 +43,7 @@ import torch
 
 from radae import RADAE, complex_bpf
 from models_sync import FrameSyncNet
-from rx2 import RADEv2Receiver
+from rx2 import ComfortNoiseGenerator, RADEv2Receiver
 
 
 NB_TOTAL_FEATURES = 36      # FARGAN/lpcnet feature vector size
@@ -67,6 +67,7 @@ class radae_rx_v2:
                  w1_dec=128, peak=True, auxdata=True,
                  bpf_en=True, agc_en=True, mute_en=True,
                  limit_pitch=True, hangover=75,
+                 comfort_noise_en=True,
                  verbose=False, reset_output_on_resync=False):
 
         self.latent_dim  = latent_dim
@@ -141,6 +142,21 @@ class radae_rx_v2:
         # For the streaming loop we need enough "prefetch" to support
         # _adjust_timing() expanding a read by sym_len//4.
         self.nin = self.sym_len
+        self.comfort_noise = ComfortNoiseGenerator(
+            self.dec_stride, self.num_features, self.auxdata, comfort_noise_en
+        )
+
+    def _pack_features(self, features_hat_slice):
+        pad = torch.zeros(
+            (features_hat_slice.shape[0],
+             features_hat_slice.shape[1],
+             NB_TOTAL_FEATURES - self.num_features),
+            dtype=features_hat_slice.dtype,
+        )
+        return torch.cat([features_hat_slice, pad], dim=-1)
+
+    def _should_emit_comfort_noise(self, symbol_count):
+        return self.comfort_noise.should_emit(symbol_count)
 
     def get_nin(self):
         return self.nin
@@ -160,8 +176,8 @@ class radae_rx_v2:
     def do_radae_rx(self, buffer_complex, floats_out):
         """Process one nin-sample chunk.
 
-        Returns 1 if floats_out was populated with a valid feature slice,
-        0 otherwise.
+        Returns 1 if floats_out was populated with either a valid feature slice
+        or a comfort-noise slice, 0 otherwise.
         """
         r = self.receiver
 
@@ -185,21 +201,23 @@ class radae_rx_v2:
                 r.timing_adj = 1
             self.nin = new_nin
 
-            if features_hat_slice is None:
+            if features_hat_slice is not None:
+                self.comfort_noise.update(features_hat_slice, r.s)
+                features_hat = self._pack_features(features_hat_slice)
+                np.copyto(
+                    floats_out,
+                    features_hat.detach().cpu().numpy().reshape(-1).astype(np.float32),
+                )
+                r.i += 1
+                return 1
+
+            if not self._should_emit_comfort_noise(r.s):
                 return 0
 
-            # Pad from num_features (21 w/ auxdata) to NB_TOTAL_FEATURES (36)
-            pad = torch.zeros(
-                (features_hat_slice.shape[0],
-                 features_hat_slice.shape[1],
-                 NB_TOTAL_FEATURES - self.num_features),
-                dtype=features_hat_slice.dtype,
-            )
-            features_hat = torch.cat([features_hat_slice, pad], dim=-1)
-            np.copyto(
-                floats_out,
-                features_hat.detach().cpu().numpy().reshape(-1).astype(np.float32),
-            )
+            features_hat = np.zeros((self.dec_stride, NB_TOTAL_FEATURES),
+                                    dtype=np.float32)
+            features_hat[:, :self.num_features] = self.comfort_noise.generate()
+            np.copyto(floats_out, features_hat.reshape(-1))
             r.i += 1
             return 1
 
@@ -229,6 +247,9 @@ def _build_argparser():
                    help='disable input AGC')
     p.add_argument('--no_mute', dest='mute', action='store_false',
                    help='disable feature-mute on signal loss')
+    p.add_argument('--no_comfort_noise', dest='comfort_noise',
+                   action='store_false',
+                   help='disable comfort-noise output when no valid decode is available')
     p.add_argument('--no_stdout', dest='use_stdout', action='store_false',
                    help='disable stdout output (for profiling)')
     p.add_argument('-v', '--verbose', action='store_true',
@@ -236,7 +257,7 @@ def _build_argparser():
     p.add_argument('--hangover', type=int, default=75)
     p.add_argument('--reset_output_on_resync', action='store_true')
     p.set_defaults(peak=True, auxdata=True, bpf=True, agc=True, mute=True,
-                   use_stdout=True)
+                   comfort_noise=True, use_stdout=True)
     return p
 
 
@@ -261,6 +282,7 @@ if __name__ == '__main__':
         agc_en=args.agc,
         mute_en=args.mute,
         hangover=args.hangover,
+        comfort_noise_en=args.comfort_noise,
         verbose=args.verbose,
         reset_output_on_resync=args.reset_output_on_resync,
     )
