@@ -8,13 +8,22 @@
 
 #include "rx2_frame_sync.h"
 
-int rx2_frame_sync_init(struct rx2_frame_sync *fs) {
-    if (!fs) {
+int rx2_frame_sync_init(struct rx2_frame_sync *fs, int auxdata, int limit_pitch, int mute) {
+    if (!fs || FRAME_SYNC_INPUT_DIM != RADE_LATENT_DIM) {
         return -1;
     }
 
     memset(fs, 0, sizeof(*fs));
+    fs->auxdata = auxdata != 0;
+    fs->limit_pitch = limit_pitch != 0;
+    fs->mute = mute != 0;
+    fs->num_features = 20 + (fs->auxdata ? 1 : 0);
+    fs->output_dim = fs->num_features * RADE_FRAMES_PER_STEP;
     fs->BETA = 0.999f;
+    if (init_radedec(&fs->dec_model, radedec_arrays) != 0) {
+        return -1;
+    }
+    rade_init_decoder(&fs->dec_state);
     return 0;
 }
 
@@ -24,6 +33,7 @@ void rx2_frame_sync_reset(struct rx2_frame_sync *fs) {
     fs->frame_sync_even = 0.0f;
     fs->frame_sync_odd = 0.0f;
     memset(fs->az_hat, 0, sizeof(fs->az_hat));
+    rade_init_decoder(&fs->dec_state);
 }
 
 void rx2_frame_sync_destroy(struct rx2_frame_sync *fs) {
@@ -32,10 +42,12 @@ void rx2_frame_sync_destroy(struct rx2_frame_sync *fs) {
 }
 
 int rx2_frame_sync_apply(struct rx2_frame_sync *fs,
-                         const float z_hat[FRAME_SYNC_INPUT_DIM], int sym_index) {
+                         const float z_hat[FRAME_SYNC_INPUT_DIM],
+                         int sym_index, int sig_det, int sine_det,
+                         float features_out[]) {
     int winning = 0;
 
-    if (!fs || !z_hat) {
+    if (!fs || !z_hat || !features_out || FRAME_SYNC_INPUT_DIM != RADE_LATENT_DIM) {
         return -1;
     }
 
@@ -53,5 +65,19 @@ int rx2_frame_sync_apply(struct rx2_frame_sync *fs,
     }
 
     memcpy(fs->az_hat, z_hat, sizeof(fs->az_hat));
+    rade_core_decoder(&fs->dec_state, &fs->dec_model, features_out, fs->az_hat, 0);
+    if (fs->limit_pitch) {
+        for (int i = 0; i < RADE_FRAMES_PER_STEP; i++) {
+            int pitch_idx = i * fs->num_features + 18;
+            if (features_out[pitch_idx] < -1.4f) {
+                features_out[pitch_idx] = -1.4f;
+            }
+        }
+    }
+    if (fs->mute && (!sig_det || sine_det)) {
+        for (int i = 0; i < RADE_FRAMES_PER_STEP; i++) {
+            features_out[i * fs->num_features] = -5.0f;
+        }
+    }
     return 1;
 }

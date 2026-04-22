@@ -113,11 +113,11 @@ f"""
     # decoder
     decoder_dense_layers = [
         ('core_decoder.module.dense_1'      , 'dec_dense1',  'TANH', False),
-        ('core_decoder.module.glu1.gate'    , 'dec_glu1',    'TANH', True),
-        ('core_decoder.module.glu2.gate'    , 'dec_glu2',    'TANH', True),
-        ('core_decoder.module.glu3.gate'    , 'dec_glu3',    'TANH', True),
-        ('core_decoder.module.glu4.gate'    , 'dec_glu4',    'TANH', True),
-        ('core_decoder.module.glu5.gate'    , 'dec_glu5',    'TANH', True),
+        ('core_decoder.module.glu1.gate'    , 'dec_glu1',    'TANH', False),
+        ('core_decoder.module.glu2.gate'    , 'dec_glu2',    'TANH', False),
+        ('core_decoder.module.glu3.gate'    , 'dec_glu3',    'TANH', False),
+        ('core_decoder.module.glu4.gate'    , 'dec_glu4',    'TANH', False),
+        ('core_decoder.module.glu5.gate'    , 'dec_glu5',    'TANH', False),
         ('core_decoder.module.output'       , 'dec_output',  'LINEAR', False)
     ]
 
@@ -127,22 +127,22 @@ f"""
 
 
     decoder_gru_layers = [
-        ('core_decoder.module.gru1'         , 'dec_gru1',    'TANH', True),
-        ('core_decoder.module.gru2'         , 'dec_gru2',    'TANH', True),
-        ('core_decoder.module.gru3'         , 'dec_gru3',    'TANH', True),
-        ('core_decoder.module.gru4'         , 'dec_gru4',    'TANH', True),
-        ('core_decoder.module.gru5'         , 'dec_gru5',    'TANH', True),
+        ('core_decoder.module.gru1'         , 'dec_gru1',    'TANH', False),
+        ('core_decoder.module.gru2'         , 'dec_gru2',    'TANH', False),
+        ('core_decoder.module.gru3'         , 'dec_gru3',    'TANH', False),
+        ('core_decoder.module.gru4'         , 'dec_gru4',    'TANH', False),
+        ('core_decoder.module.gru5'         , 'dec_gru5',    'TANH', False),
     ]
 
     dec_max_rnn_units = max([dump_torch_weights(dec_writer, model.get_submodule(name), export_name, verbose=True, input_sparse=True, quantize=quantize, scale=None, recurrent_scale=None)
                              for name, export_name, _, quantize in decoder_gru_layers])
 
     decoder_conv_layers = [
-        ('core_decoder.module.conv1.conv'       , 'dec_conv1',   'TANH', True),
-        ('core_decoder.module.conv2.conv'       , 'dec_conv2',   'TANH', True),
-        ('core_decoder.module.conv3.conv'       , 'dec_conv3',   'TANH', True),
-        ('core_decoder.module.conv4.conv'       , 'dec_conv4',   'TANH', True),
-        ('core_decoder.module.conv5.conv'       , 'dec_conv5',   'TANH', True),
+        ('core_decoder.module.conv1.conv'       , 'dec_conv1',   'TANH', False),
+        ('core_decoder.module.conv2.conv'       , 'dec_conv2',   'TANH', False),
+        ('core_decoder.module.conv3.conv'       , 'dec_conv3',   'TANH', False),
+        ('core_decoder.module.conv4.conv'       , 'dec_conv4',   'TANH', False),
+        ('core_decoder.module.conv5.conv'       , 'dec_conv5',   'TANH', False),
     ]
 
     dec_max_conv_inputs = max([dump_torch_weights(dec_writer, model.get_submodule(name), export_name, verbose=True, quantize=quantize, scale=None) for name, export_name, _, quantize in decoder_conv_layers])
