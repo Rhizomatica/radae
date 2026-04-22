@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #ifdef _WIN32
 #include <io.h>
 #include <fcntl.h>
@@ -8,14 +9,41 @@
 
 #include "rade_api.h"
 
-int main(void)
+static void usage(const char *prog)
 {
+    fprintf(stderr,
+            "Usage: %s [--model_name path] [--model path] "
+            "[--frame_sync_model_name path] [--fsync path] [-v|--verbose]\n",
+            prog);
+}
+
+int main(int argc, char *argv[])
+{
+    const char *model_name = "250725/checkpoints/checkpoint_epoch_200.pth";
+    const char *frame_sync_model_name = "250725a_ml_sync";
+    int flags = RADE_VERBOSE_0;
+
+    for (int i = 1; i < argc; i++) {
+        if ((!strcmp(argv[i], "--model_name") || !strcmp(argv[i], "--model")) && i + 1 < argc) {
+            model_name = argv[++i];
+        } else if ((!strcmp(argv[i], "--frame_sync_model_name") || !strcmp(argv[i], "--fsync")) && i + 1 < argc) {
+            frame_sync_model_name = argv[++i];
+        } else if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--verbose")) {
+            flags &= ~RADE_VERBOSE_0;
+        } else if (!strcmp(argv[i], "--quiet")) {
+            flags |= RADE_VERBOSE_0;
+        } else {
+            usage(argv[0]);
+            return 1;
+        }
+    }
+
     rade_initialize();
 
     struct rade *r = rade_rx_v2_pure_c_open(
-        "250725/checkpoints/checkpoint_epoch_200.pth",
-        "250725a_ml_sync",
-        RADE_VERBOSE_0);
+        model_name,
+        frame_sync_model_name,
+        flags);
     assert(r != NULL);
 
     int n_features_out = rade_n_features_in_out(r);
