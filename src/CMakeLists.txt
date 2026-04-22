@@ -45,6 +45,9 @@ target_link_libraries(test_frame_sync m)
 
 add_executable(test_complex_bpf test_complex_bpf.c complex_bpf.c)
 target_link_libraries(test_complex_bpf m)
+
+add_executable(test_rx2_frontend test_rx2_frontend.c rx2_frontend.c)
+target_link_libraries(test_rx2_frontend m)
 endif (NOT WIN32)
 
 add_executable(write_rade_weights write_rade_weights.c)
@@ -56,4 +59,3 @@ add_dependencies(rade build_opus_arm)
 else(APPLE AND BUILD_OSX_UNIVERSAL)
 add_dependencies(rade build_opus)
 endif(APPLE AND BUILD_OSX_UNIVERSAL)
-
