@@ -1,4 +1,4 @@
-/* Auto generated from checkpoint checkpoint_epoch_100.pth */
+/* Auto generated from checkpoint checkpoint_epoch_200.pth */
 
 
 #ifndef RADE_DEC_DATA_H
@@ -14,77 +14,77 @@
 #include "rade_constants.h"
 
 
-#define DEC_DENSE1_OUT_SIZE 96
+#define DEC_DENSE1_OUT_SIZE 128
 
-#define DEC_GLU1_OUT_SIZE 96
+#define DEC_GLU1_OUT_SIZE 128
 
-#define DEC_GLU2_OUT_SIZE 96
+#define DEC_GLU2_OUT_SIZE 128
 
-#define DEC_GLU3_OUT_SIZE 96
+#define DEC_GLU3_OUT_SIZE 128
 
-#define DEC_GLU4_OUT_SIZE 96
+#define DEC_GLU4_OUT_SIZE 128
 
-#define DEC_GLU5_OUT_SIZE 96
+#define DEC_GLU5_OUT_SIZE 128
 
 #define DEC_OUTPUT_OUT_SIZE 84
 
-#define DEC_GRU1_OUT_SIZE 96
+#define DEC_GRU1_OUT_SIZE 128
 
-#define DEC_GRU1_STATE_SIZE 96
+#define DEC_GRU1_STATE_SIZE 128
 
-#define DEC_GRU2_OUT_SIZE 96
+#define DEC_GRU2_OUT_SIZE 128
 
-#define DEC_GRU2_STATE_SIZE 96
+#define DEC_GRU2_STATE_SIZE 128
 
-#define DEC_GRU3_OUT_SIZE 96
+#define DEC_GRU3_OUT_SIZE 128
 
-#define DEC_GRU3_STATE_SIZE 96
+#define DEC_GRU3_STATE_SIZE 128
 
-#define DEC_GRU4_OUT_SIZE 96
+#define DEC_GRU4_OUT_SIZE 128
 
-#define DEC_GRU4_STATE_SIZE 96
+#define DEC_GRU4_STATE_SIZE 128
 
-#define DEC_GRU5_OUT_SIZE 96
+#define DEC_GRU5_OUT_SIZE 128
 
-#define DEC_GRU5_STATE_SIZE 96
+#define DEC_GRU5_STATE_SIZE 128
 
 #define DEC_CONV1_OUT_SIZE 32
 
-#define DEC_CONV1_IN_SIZE 192
+#define DEC_CONV1_IN_SIZE 256
 
-#define DEC_CONV1_STATE_SIZE (192 * (1))
+#define DEC_CONV1_STATE_SIZE (256 * (1))
 
 #define DEC_CONV1_DELAY 0
 
 #define DEC_CONV2_OUT_SIZE 32
 
-#define DEC_CONV2_IN_SIZE 320
+#define DEC_CONV2_IN_SIZE 416
 
-#define DEC_CONV2_STATE_SIZE (320 * (1))
+#define DEC_CONV2_STATE_SIZE (416 * (1))
 
 #define DEC_CONV2_DELAY 0
 
 #define DEC_CONV3_OUT_SIZE 32
 
-#define DEC_CONV3_IN_SIZE 448
+#define DEC_CONV3_IN_SIZE 576
 
-#define DEC_CONV3_STATE_SIZE (448 * (1))
+#define DEC_CONV3_STATE_SIZE (576 * (1))
 
 #define DEC_CONV3_DELAY 0
 
 #define DEC_CONV4_OUT_SIZE 32
 
-#define DEC_CONV4_IN_SIZE 576
+#define DEC_CONV4_IN_SIZE 736
 
-#define DEC_CONV4_STATE_SIZE (576 * (1))
+#define DEC_CONV4_STATE_SIZE (736 * (1))
 
 #define DEC_CONV4_DELAY 0
 
 #define DEC_CONV5_OUT_SIZE 32
 
-#define DEC_CONV5_IN_SIZE 704
+#define DEC_CONV5_IN_SIZE 896
 
-#define DEC_CONV5_STATE_SIZE (704 * (1))
+#define DEC_CONV5_STATE_SIZE (896 * (1))
 
 #define DEC_CONV5_DELAY 0
 
@@ -113,6 +113,6 @@ struct RADEDec {
     LinearLayer dec_conv5;
 };
 
-int init_radedec(RADEDec *model, const WeightArray *arrays, int output_dim);
+int init_radedec(RADEDec *model, const WeightArray *arrays);
 
 #endif /* RADE_DEC_DATA_H */

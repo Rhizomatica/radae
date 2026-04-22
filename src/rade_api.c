@@ -213,7 +213,7 @@ int rade_tx_open(struct rade *r) {
     PyTuple_SetItem(r->pArgs_radae_set_eoo_bits, 0, pValue);
     
     if (r->flags & RADE_USE_C_ENCODER) {
-      if (init_radeenc(&r->enc_model, radeenc_arrays, r->num_features*RADE_FRAMES_PER_STEP) != 0) {
+      if (init_radeenc(&r->enc_model, radeenc_arrays) != 0) {
         fprintf(stderr, "Error initialising built-in C encoder model\n");
         exit(1);        
       }
@@ -306,7 +306,7 @@ int rade_rx_open(struct rade *r) {
     check_callable(r->pMeth_sum_uw_errors, sum_uw_errors_meth_name, "not callable");
 
     if (r->flags & RADE_USE_C_DECODER) {
-      if (init_radedec(&r->dec_model, radedec_arrays, r->num_features*RADE_FRAMES_PER_STEP) != 0) {
+      if (init_radedec(&r->dec_model, radedec_arrays) != 0) {
         fprintf(stderr, "Error initialising built-in C decoder model\n");
         exit(1);        
       }
