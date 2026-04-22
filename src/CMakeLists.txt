@@ -48,6 +48,9 @@ target_link_libraries(test_complex_bpf m)
 
 add_executable(test_rx2_frontend test_rx2_frontend.c rx2_frontend.c)
 target_link_libraries(test_rx2_frontend m)
+
+add_executable(test_rx2_coarse_sync test_rx2_coarse_sync.c rx2_coarse_sync.c)
+target_link_libraries(test_rx2_coarse_sync m)
 endif (NOT WIN32)
 
 add_executable(write_rade_weights write_rade_weights.c)
