@@ -38,11 +38,19 @@
 */
 """
 
-import os, sys, struct, argparse
+import os, sys, struct, argparse, signal
 import numpy as np
 import torch
 
 from radae import RADAE, complex_bpf
+
+
+class _EOORequest(BaseException):
+    """Raised from the SIGUSR1 handler to break the main TX loop out of
+    stdin.read() so an end-of-over frame can be emitted on demand.
+    BaseException (not Exception) so it isn't swallowed by torch/numpy
+    internals that use broad `except Exception` blocks."""
+    pass
 
 
 NB_TOTAL_FEATURES = 36      # FARGAN/lpcnet feature vector size
@@ -216,6 +224,11 @@ def _build_argparser():
                    help='enable transmit BPF (default disabled)')
     p.add_argument('--no_eoo', dest='send_eoo', action='store_false',
                    help='do not emit EOO frame on shutdown')
+    p.add_argument('--pid_file', type=str, default=None,
+                   help='write our own PID to this path at startup; lets '
+                        'the C host send SIGUSR1 directly (the pipeline '
+                        'runs under sh -c, so the fork PID points at sh, '
+                        'not python)')
     p.set_defaults(peak=True, auxdata=True, txbpf=False, send_eoo=True)
     return p
 
@@ -248,17 +261,49 @@ if __name__ == '__main__':
     stdin  = sys.stdin.buffer
     stdout = sys.stdout.buffer
 
+    def _emit_eoo():
+        tx.do_eoo(eoo_out)
+        stdout.write(eoo_out.tobytes())
+        stdout.flush()
+
+    def _handle_sigusr1(signum, frame):
+        # Raising out of the handler is what makes stdin.read() unblock
+        # (PEP 475: syscalls are NOT retried when the handler raises).
+        raise _EOORequest()
+
+    signal.signal(signal.SIGUSR1, _handle_sigusr1)
+
+    if args.pid_file:
+        try:
+            with open(args.pid_file, 'w') as f:
+                f.write(f"{os.getpid()}\n")
+        except OSError as e:
+            print(f"radae_txe2: failed to write pid_file {args.pid_file}: {e}",
+                  file=sys.stderr)
+
     try:
         while True:
-            buf = stdin.read(want)
-            if len(buf) != want:
-                break
-            buffer_f32 = np.frombuffer(buf, np.single)
-            tx.do_radae_tx(buffer_f32, tx_out)
-            stdout.write(tx_out.tobytes())
-            stdout.flush()
+            try:
+                buf = stdin.read(want)
+                if len(buf) != want:
+                    break
+                buffer_f32 = np.frombuffer(buf, np.single)
+                tx.do_radae_tx(buffer_f32, tx_out)
+                stdout.write(tx_out.tobytes())
+                stdout.flush()
+            except _EOORequest:
+                # Block further SIGUSR1 during emission so a rapid second
+                # signal can't re-raise inside _emit_eoo itself.
+                old = signal.pthread_sigmask(signal.SIG_BLOCK, [signal.SIGUSR1])
+                try:
+                    _emit_eoo()
+                finally:
+                    signal.pthread_sigmask(signal.SIG_SETMASK, old)
     finally:
         if args.send_eoo:
-            tx.do_eoo(eoo_out)
-            stdout.write(eoo_out.tobytes())
-            stdout.flush()
+            _emit_eoo()
+        if args.pid_file:
+            try:
+                os.unlink(args.pid_file)
+            except OSError:
+                pass
