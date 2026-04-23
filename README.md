@@ -149,9 +149,9 @@ This section is optional - pre-trained models that run on a standard laptop CPU 
       training_features_file.f32 250725 \
      --latent-dim 56 --cp 0.004 --auxdata --w1_dec 128 --peak \
      --h_file h_nc14_mpp_train.c64 --h_complex --range_EbNo --range_EbNo_start 3 \
-     --timing_rand --timing_jitter 0.002 --freq_rand --ssb_bpf
+     --timing_rand --freq_rand --ssb_bpf --plot_loss
    ```
-1. Generate latent vectors from the trained model for ML sync training.  This runs one pass through the training data without updating weights:
+1. Generate latent vectors from the trained model for ML sync training.  This runs one pass through the training data without updating weights. Note the addition of +/- 2 ms of timing jitter, to maintain frame sync across the delay spread of multipath channels:
    ```
    python3 train.py --cuda-visible-devices 0 --sequence-length 400 --batch-size 512 \
      --epochs 200 --lr 0.003 --lr-decay-factor 0.0001 \
