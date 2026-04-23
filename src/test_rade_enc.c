@@ -61,11 +61,11 @@ int main(int argc, char *argv[])
         for (int i=0;i<nb_arrays;i++) {
             fprintf(stderr, "found %s: size %d\n", list[i].name, list[i].size);
         }
-        if (init_radeenc(&enc_model, list, input_dim) != 0) {
+        if (init_radeenc(&enc_model, list) != 0) {
             fprintf(stderr, "Error initialising encoder model from %s\n", argv[3]);
             exit(1);       
         }
-    } else if (init_radeenc(&enc_model, radeenc_arrays, input_dim) != 0) {
+    } else if (init_radeenc(&enc_model, radeenc_arrays) != 0) {
         fprintf(stderr, "Error initialising built-in encoder model\n");
         exit(1);        
     }

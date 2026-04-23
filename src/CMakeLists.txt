@@ -1,5 +1,22 @@
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
+set(RADE_PURE_C_RX_SOURCES
+    rade_api.c
+    rade_enc.c
+    rade_dec.c
+    rade_enc_data.c
+    rade_dec_data.c
+    complex_bpf.c
+    frame_sync.c
+    frame_sync_data.c
+    rx2_frontend.c
+    rx2_coarse_sync.c
+    rx2_demod.c
+    rx2_eoo.c
+    rx2_frame_sync.c
+    rx2_receiver.c
+    rx2_model_data.c)
+
 add_executable(ch ch.c ch_fdmdv.c)
 target_link_libraries(ch m)
 
@@ -9,7 +26,22 @@ target_link_libraries(mksine m)
 add_executable(lpcnet_demo lpcnet_demo.c)
 target_link_libraries(lpcnet_demo opus m)
 
-add_library(rade rade_api.c rade_enc.c rade_dec.c rade_enc_data.c rade_dec_data.c)
+add_library(rade
+    rade_api.c
+    rade_enc.c
+    rade_dec.c
+    rade_enc_data.c
+    rade_dec_data.c
+    complex_bpf.c
+    frame_sync.c
+    frame_sync_data.c
+    rx2_frontend.c
+    rx2_coarse_sync.c
+    rx2_demod.c
+    rx2_eoo.c
+    rx2_frame_sync.c
+    rx2_receiver.c
+    rx2_model_data.c)
 if(APPLE OR WIN32)
 target_link_libraries(rade Python3::Python opus)
 else(APPLE OR WIN32)
@@ -33,12 +65,57 @@ target_link_libraries(radae_rx rade opus m Python3::Python)
 target_include_directories(radae_rx PRIVATE
     "$<TARGET_PROPERTY:Python3::NumPy,INTERFACE_INCLUDE_DIRECTORIES>")
 
+add_executable(radae_rx_v2 radae_rx_v2.c ${RADE_PURE_C_RX_SOURCES})
+target_link_libraries(radae_rx_v2 opus m Python3::Python)
+target_include_directories(radae_rx_v2 PRIVATE
+    "$<TARGET_PROPERTY:Python3::NumPy,INTERFACE_INCLUDE_DIRECTORIES>")
+
 if (NOT WIN32)
 add_executable(test_rade_enc test_rade_enc.c)
 target_link_libraries(test_rade_enc rade opus m)
 
 add_executable(test_rade_dec test_rade_dec.c)
 target_link_libraries(test_rade_dec rade opus m)
+
+add_executable(test_frame_sync test_frame_sync.c frame_sync.c frame_sync_data.c)
+target_link_libraries(test_frame_sync m)
+
+add_executable(test_complex_bpf test_complex_bpf.c complex_bpf.c)
+target_link_libraries(test_complex_bpf m)
+
+add_executable(test_rx2_frontend test_rx2_frontend.c rx2_frontend.c)
+target_link_libraries(test_rx2_frontend m)
+
+add_executable(test_rx2_coarse_sync test_rx2_coarse_sync.c rx2_coarse_sync.c)
+target_link_libraries(test_rx2_coarse_sync m)
+
+add_executable(test_rx2_demod test_rx2_demod.c rx2_demod.c)
+target_link_libraries(test_rx2_demod m)
+
+add_executable(test_rx2_eoo test_rx2_eoo.c rx2_eoo.c)
+target_link_libraries(test_rx2_eoo m)
+
+add_executable(test_rx2_frame_sync test_rx2_frame_sync.c rx2_frame_sync.c frame_sync.c frame_sync_data.c rade_dec.c rade_dec_data.c)
+target_link_libraries(test_rx2_frame_sync opus m)
+
+add_executable(test_rx2_receiver
+    test_rx2_receiver.c
+    rx2_receiver.c
+    rx2_frontend.c
+    rx2_coarse_sync.c
+    rx2_demod.c
+    rx2_eoo.c
+    rx2_frame_sync.c
+    frame_sync.c
+    frame_sync_data.c
+    rade_dec.c
+    rade_dec_data.c)
+target_link_libraries(test_rx2_receiver opus m)
+
+add_executable(test_rade_rx_v2 test_rade_rx_v2.c ${RADE_PURE_C_RX_SOURCES})
+target_link_libraries(test_rade_rx_v2 opus m Python3::Python)
+target_include_directories(test_rade_rx_v2 PRIVATE
+    "$<TARGET_PROPERTY:Python3::NumPy,INTERFACE_INCLUDE_DIRECTORIES>")
 endif (NOT WIN32)
 
 add_executable(write_rade_weights write_rade_weights.c)
@@ -50,5 +127,3 @@ add_dependencies(rade build_opus_arm)
 else(APPLE AND BUILD_OSX_UNIVERSAL)
 add_dependencies(rade build_opus)
 endif(APPLE AND BUILD_OSX_UNIVERSAL)
-
-

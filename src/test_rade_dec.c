@@ -60,11 +60,11 @@ int main(int argc, char *argv[])
         for (int i=0;i<nb_arrays;i++) {
             fprintf(stderr, "found %s: size %d\n", list[i].name, list[i].size);
         }
-        if (init_radedec(&dec_model, list, output_dim) != 0) {
+        if (init_radedec(&dec_model, list) != 0) {
             fprintf(stderr, "Error initialising decoder model from %s\n", argv[2]);
             exit(1);       
         }
-    } else if (init_radedec(&dec_model, radedec_arrays, output_dim) != 0) {
+    } else if (init_radedec(&dec_model, radedec_arrays) != 0) {
         fprintf(stderr, "Error initialising built-in decoder model\n");
         exit(1);        
     }

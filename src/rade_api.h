@@ -71,6 +71,10 @@ extern "C" {
 #define RADE_MODEM_SAMPLE_RATE 8000           // modem waveform sample rate
 #define RADE_SPEECH_SAMPLE_RATE 16000         // speech sample rate
 
+// Compiled-in identifiers used by the pure-C RADEv2 RX path.
+#define RADE_RX_V2_COMPILED_MODEL_NAME "250725/checkpoints/checkpoint_epoch_200.pth"
+#define RADE_RX_V2_COMPILED_FRAME_SYNC_MODEL_NAME "250725a_ml_sync"
+
 // init rade_open() flags
 #define RADE_USE_C_ENCODER 0x1
 #define RADE_USE_C_DECODER 0x2
@@ -86,6 +90,17 @@ RADE_EXPORT void rade_finalize(void);
 
 // note single context only in this version, one context has one Tx, and one Rx
 RADE_EXPORT struct rade *rade_open(char model_file[], int flags);
+/*
+ * Open the RADEv2 pure-C RX path backed by compiled-in weights/data.
+ *
+ * model_file and frame_sync_model_file are accepted for API compatibility with
+ * the Python V2 wrapper, but they must be empty/NULL or match the compiled-in
+ * identifiers above. This path always uses the built-in 250725 / 56-dim model
+ * export and compiled frame-sync network.
+ */
+RADE_EXPORT struct rade *rade_rx_v2_pure_c_open(const char model_file[],
+                                                const char frame_sync_model_file[],
+                                                int flags);
 RADE_EXPORT void rade_close(struct rade *r);
 
 // Allows API users to determine if the API has changed
@@ -118,6 +133,8 @@ RADE_EXPORT int rade_nin(struct rade *r);
 // has_eoo_out is set, eoo_out[] contains End of Over soft decision bits
 // from QPSK symbols in ..IQIQI... order
 RADE_EXPORT int rade_rx(struct rade *r, float features_out[], int *has_eoo_out, float eoo_out[], RADE_COMP rx_in[]);
+/* Pure-C RADEv2 RX dispatch.  Same contract as rade_rx(); has_eoo_out is always 0. */
+RADE_EXPORT int rade_rx_v2_pure_c(struct rade *r, float features_out[], int *has_eoo_out, float eoo_out[], RADE_COMP rx_in[]);
 
 // returns non-zero if Rx is currently in sync
 RADE_EXPORT int rade_sync(struct rade *r);
