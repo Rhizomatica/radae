@@ -43,9 +43,23 @@ int main(void) {
     }
 
     rade_initialize();
+    if (rade_rx_v2_pure_c_open("unexpected-model",
+                               RADE_RX_V2_COMPILED_FRAME_SYNC_MODEL_NAME,
+                               RADE_VERBOSE_0) != NULL) {
+        fprintf(stderr, "unexpected success for invalid model identifier\n");
+        rade_finalize();
+        return 1;
+    }
+    if (rade_rx_v2_pure_c_open(RADE_RX_V2_COMPILED_MODEL_NAME,
+                               "unexpected-frame-sync",
+                               RADE_VERBOSE_0) != NULL) {
+        fprintf(stderr, "unexpected success for invalid frame sync identifier\n");
+        rade_finalize();
+        return 1;
+    }
     r = rade_rx_v2_pure_c_open(
-        "250725/checkpoints/checkpoint_epoch_200.pth",
-        "250725a_ml_sync",
+        RADE_RX_V2_COMPILED_MODEL_NAME,
+        RADE_RX_V2_COMPILED_FRAME_SYNC_MODEL_NAME,
         RADE_VERBOSE_0);
     if (!r) {
         fprintf(stderr, "rade_rx_v2_pure_c_open failed\n");

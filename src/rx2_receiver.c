@@ -10,6 +10,10 @@
 
 #include "rx2_receiver.h"
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 static void rx2_receiver_zero(struct rx2_receiver *rx) {
     rx->M = 0;
     rx->Ncp = 0;

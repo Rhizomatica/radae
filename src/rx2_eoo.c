@@ -11,6 +11,10 @@
 #include "rx2_eoo.h"
 #include "comp_prim.h"
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 static void rx2_eoo_zero(struct rx2_eoo *eoo) {
     eoo->M = 0;
     eoo->Ncp = 0;

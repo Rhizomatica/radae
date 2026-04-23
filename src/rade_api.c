@@ -38,6 +38,7 @@
 
 #include <assert.h>
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 #include "rade_api.h"
 
@@ -57,6 +58,17 @@
 #include "complex_bpf.h"
 #include "rx2_model_data.h"
 #include "rx2_receiver.h"
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
+enum {
+  RADE_TOTAL_FEATURES = 36,
+  RADE_USED_FEATURES = 20,
+  RADE_AUXDATA_FEATURES = 1,
+  RADE_MAX_FEATURES_PER_FRAME = RADE_USED_FEATURES + RADE_AUXDATA_FEATURES
+};
 
 static PyThreadState* main_thread_state; // needed to unlock the GIL after initialization
 
@@ -106,10 +118,34 @@ struct rade {
 };
 
 static void rade_set_common_feature_meta(struct rade *r) {
-  r->auxdata = 1;
-  r->nb_total_features = 36;
-  r->num_used_features = 20;
+  r->auxdata = RADE_AUXDATA_FEATURES;
+  r->nb_total_features = RADE_TOTAL_FEATURES;
+  r->num_used_features = RADE_USED_FEATURES;
   r->num_features = r->num_used_features + r->auxdata;
+  assert(r->num_features <= RADE_MAX_FEATURES_PER_FRAME);
+}
+
+static int rade_is_compiled_rx_v2_identifier(const char requested[],
+                                             const char compiled_in[]) {
+  return requested == NULL || requested[0] == '\0' || strcmp(requested, compiled_in) == 0;
+}
+
+static int rade_validate_rx_v2_model_paths(const char model_file[],
+                                           const char frame_sync_model_file[]) {
+  if (!rade_is_compiled_rx_v2_identifier(model_file, RADE_RX_V2_COMPILED_MODEL_NAME)) {
+    fprintf(stderr,
+            "rade_rx_v2_pure_c_open: requested model \"%s\" does not match compiled-in model \"%s\"\n",
+            model_file, RADE_RX_V2_COMPILED_MODEL_NAME);
+    return -1;
+  }
+  if (!rade_is_compiled_rx_v2_identifier(frame_sync_model_file,
+                                         RADE_RX_V2_COMPILED_FRAME_SYNC_MODEL_NAME)) {
+    fprintf(stderr,
+            "rade_rx_v2_pure_c_open: requested frame sync model \"%s\" does not match compiled-in model \"%s\"\n",
+            frame_sync_model_file, RADE_RX_V2_COMPILED_FRAME_SYNC_MODEL_NAME);
+    return -1;
+  }
+  return 0;
 }
 
 
@@ -394,14 +430,18 @@ struct rade *rade_open(char model_file[], int flags) {
 struct rade *rade_rx_v2_pure_c_open(const char model_file[],
                                     const char frame_sync_model_file[],
                                     int flags) {
-  struct rade *r = (struct rade*)calloc(1, sizeof(struct rade));
+  struct rade *r;
   struct rx2_receiver_config cfg;
   float B_bpf;
 
-  (void)model_file;
-  (void)frame_sync_model_file;
+  if (rade_validate_rx_v2_model_paths(model_file, frame_sync_model_file) != 0) {
+    return NULL;
+  }
 
-  assert(r != NULL);
+  r = (struct rade*)calloc(1, sizeof(struct rade));
+  if (r == NULL) {
+    return NULL;
+  }
   r->backend = RADE_BACKEND_RX_V2_PURE_C;
   r->flags = flags | RADE_USE_C_DECODER;
   rade_set_common_feature_meta(r);
@@ -443,7 +483,11 @@ struct rade *rade_rx_v2_pure_c_open(const char model_file[],
   r->freq_offset = 0.0f;
   r->rx2_bpf_en = 1;
   r->rx2_bpf_out = (RADE_COMP *)malloc(sizeof(*r->rx2_bpf_out) * r->nin_max);
-  assert(r->rx2_bpf_out != NULL);
+  if (r->rx2_bpf_out == NULL) {
+    rx2_receiver_destroy(&r->rx2_receiver);
+    free(r);
+    return NULL;
+  }
   if (complex_bpf_init(&r->rx2_bpf, 101, RX2_MODEL_FS, B_bpf,
                        (rx2_model_w[RX2_MODEL_NC - 1] + rx2_model_w[0]) * RX2_MODEL_FS / (4.0f * (float)M_PI),
                        r->nin_max) != 0) {
@@ -558,7 +602,7 @@ int rade_tx_eoo(struct rade *r, RADE_COMP tx_eoo_out[]) {
 
 int rade_rx_v2_pure_c(struct rade *r, float features_out[], int *has_eoo_out, float eoo_out[], RADE_COMP rx_in[]) {
   struct rx2_receiver_step step;
-  float raw_features[RADE_FRAMES_PER_STEP * 21];
+  float raw_features[RADE_FRAMES_PER_STEP * RADE_MAX_FEATURES_PER_FRAME];
   const RADE_COMP *rx_step = rx_in;
   (void)eoo_out;
 

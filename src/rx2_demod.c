@@ -11,6 +11,10 @@
 #include "rx2_demod.h"
 #include "comp_prim.h"
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 static void rx2_demod_zero(struct rx2_demod *dm) {
     dm->M = 0;
     dm->Ncp = 0;

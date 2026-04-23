@@ -19,8 +19,8 @@ static void usage(const char *prog)
 
 int main(int argc, char *argv[])
 {
-    const char *model_name = "250725/checkpoints/checkpoint_epoch_200.pth";
-    const char *frame_sync_model_name = "250725a_ml_sync";
+    const char *model_name = RADE_RX_V2_COMPILED_MODEL_NAME;
+    const char *frame_sync_model_name = RADE_RX_V2_COMPILED_FRAME_SYNC_MODEL_NAME;
     int flags = RADE_VERBOSE_0;
 
     for (int i = 1; i < argc; i++) {
@@ -44,15 +44,27 @@ int main(int argc, char *argv[])
         model_name,
         frame_sync_model_name,
         flags);
-    assert(r != NULL);
+    if (r == NULL) {
+        rade_finalize();
+        return 1;
+    }
 
     int n_features_out = rade_n_features_in_out(r);
     float *features_out = (float *)malloc(sizeof(float) * n_features_out);
-    assert(features_out != NULL);
+    if (features_out == NULL) {
+        rade_close(r);
+        rade_finalize();
+        return 1;
+    }
 
     int n_rx_in = rade_nin_max(r);
     RADE_COMP *rx_in = (RADE_COMP *)malloc(sizeof(RADE_COMP) * n_rx_in);
-    assert(rx_in != NULL);
+    if (rx_in == NULL) {
+        free(features_out);
+        rade_close(r);
+        rade_finalize();
+        return 1;
+    }
 
     int nin = rade_nin(r);
     int has_eoo_out = 0;
