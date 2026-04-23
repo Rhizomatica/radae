@@ -42,7 +42,7 @@ For deployment and distribution of RADE V1 and V2, please use the C ports.
    
 # Reference and License
 
-D. Rowe, J.-M. Valin, [RADE: A Neural Codec for Transmitting Speech over HF Radio Channels](https://arxiv.org/abs/2505.06671), arXiv:2505.06671, 2025.  This paper describes RADE V1; a V2 paper is planned as future work.
+D. Rowe, J.-M. Valin, [RADE: A Neural Codec for Transmitting Speech over HF Radio Channels](https://arxiv.org/abs/2505.06671), arXiv:2505.06671, 2025.  This paper describes RADE V1; a V2 paper is planned as future work.  The companion branch of this repo (with a RADE V1 focus) is waspaa_2025.
 
 The RADE source code is released under the two-clause BSD license.
 
