@@ -846,7 +846,7 @@ class RADAE(nn.Module):
             n = sigma*torch.randn_like(tx_sym)
             rx_sym = tx_sym + n
             
-        # strip out the pilots if present (future work: pass to ML decoder network, lots of useful information)
+        # strip out the pilots if present
         if self.pilots:
             rx_sym_pilots = torch.reshape(rx_sym,(num_batches, num_modem_frames, self.Ns+1, self.Nc))
 
