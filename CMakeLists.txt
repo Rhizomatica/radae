@@ -862,3 +862,15 @@ add_test(NAME v2_snr_est_low
                        python3 check_snr_est.py \$SNR3K snr_est_low.f32 2.0")
          set_tests_properties(v2_snr_est_low PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
+# tx2.sh test: encode with tx2.sh, decode with rx2.sh, compare to inference.py reference
+add_test(NAME v2_tx2
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
+                       ./tx2.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/brian_g8sez.wav v2_tx2_rx.f32; \
+                       python3 inference.py 250725/checkpoints/checkpoint_epoch_200.pth features_in.f32 features_out.f32 \
+                       --latent-dim 56 --w1_dec 128 --auxdata --rate_Fs --cp 0.004 \
+                       --time_offset -16 --correct_time_offset -8 --peak; \
+                       ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync v2_tx2_rx.f32 /dev/null --quiet; \
+                       python3 loss.py features_in.f32 features_out.f32 --features_hat2 features_out_rx2.f32 \
+                       --clip_start 100 --clip_end 300 --compare --delta 0.05")
+         set_tests_properties(v2_tx2 PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
