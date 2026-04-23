@@ -43,6 +43,13 @@ int rx2_eoo_init(struct rx2_eoo *eoo, int M, int Ncp, const COMP pend[]);
 /* Reset the IIR-smoothed detector state to the Python constructor state. */
 void rx2_eoo_reset(struct rx2_eoo *eoo);
 
+/*
+ * Zero the IIR smoother without touching DFT buffers or the last raw
+ * correlation.  Mirrors rx2.py's `self.eoo_smooth = 0.0` on resync, which
+ * intentionally leaves `_eoo_corr` at its most recent value.
+ */
+void rx2_eoo_clear_smoothing(struct rx2_eoo *eoo);
+
 /* Release dynamic storage held by the detector state. */
 void rx2_eoo_destroy(struct rx2_eoo *eoo);
 

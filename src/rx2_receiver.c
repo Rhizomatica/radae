@@ -204,7 +204,7 @@ int rx2_receiver_process(struct rx2_receiver *rx,
             rx->count1 = 0;
             rx->frame_sync.frame_sync_even = 0.0f;
             rx->frame_sync.frame_sync_odd = 0.0f;
-            rx->eoo.eoo_smooth = 0.0f;
+            rx2_eoo_clear_smoothing(&rx->eoo);
             if (rx->reset_output_on_resync) {
                 rx->i = 0;
             }
@@ -250,7 +250,7 @@ int rx2_receiver_process(struct rx2_receiver *rx,
         if (rx2_eoo_apply(&rx->eoo, rx->demod.rx_sym_td)) {
             rx->count = 0;
             rx->count1 = 0;
-            rx->eoo.eoo_smooth = 0.0f;
+            rx2_eoo_clear_smoothing(&rx->eoo);
             memset(rx->coarse_sync.Ry_smooth, 0,
                    (size_t)rx->coarse_sync.sym_len * sizeof(*rx->coarse_sync.Ry_smooth));
             next_state = RX2_RECEIVER_IDLE;

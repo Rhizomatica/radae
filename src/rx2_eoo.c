@@ -116,6 +116,11 @@ void rx2_eoo_reset(struct rx2_eoo *eoo) {
     if (eoo->h_est) memset(eoo->h_est, 0, (size_t)eoo->M * sizeof(*eoo->h_est));
 }
 
+void rx2_eoo_clear_smoothing(struct rx2_eoo *eoo) {
+    if (!eoo) return;
+    eoo->eoo_smooth = 0.0f;
+}
+
 void rx2_eoo_destroy(struct rx2_eoo *eoo) {
     if (!eoo) return;
     free(eoo->pend_fd);
