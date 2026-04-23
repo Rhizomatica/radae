@@ -227,10 +227,14 @@ class RADEv2Receiver:
          self.Ry_norm[gamma] = 2.0 * Ry / np.abs(D)
       self.Ry_smooth = self.ALPHA * self.Ry_smooth + (1.0 - self.ALPHA) * self.Ry_norm
 
+   def _fix_delta_hat(self):
+      return int(getattr(self.args, "fix_delta_hat", 0))
+
    def _detect_signal(self):
-      abs_Ry           = np.abs(self.Ry_smooth)
-      if args.fix_delta_hat:
-         self.delta_hat_g = args.fix_delta_hat
+      abs_Ry          = np.abs(self.Ry_smooth)
+      fixed_delta_hat = self._fix_delta_hat()
+      if fixed_delta_hat:
+         self.delta_hat_g = fixed_delta_hat
       else:
          self.delta_hat_g = np.int16(np.argmax(abs_Ry))
       self.Ry_max      = abs_Ry[int(self.delta_hat_g)]
@@ -372,7 +376,7 @@ class RADEv2Receiver:
 
    def _adjust_timing(self, nin):
       """Shift delta_hat and Ry_smooth to keep timing away from buffer boundaries."""
-      if not self.timing_adj or args.fix_delta_hat:
+      if not self.timing_adj or self._fix_delta_hat():
          return nin
       shift = self.sym_len // 4
       if self.delta_hat > 3 * self.sym_len // 4:

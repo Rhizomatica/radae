@@ -710,6 +710,15 @@ add_test(NAME v2_timing_high_delta2
                        delta=0.05 ./test/v2_timing.sh --g_file g_mpp_high.f32 --correct_time_offset -8 --fix_delta_hat 48 --quiet")
          set_tests_properties(v2_timing_high_delta2 PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
+# Regression coverage for library-style rx2 imports. generate_rx2_receiver_vectors.py
+# constructs RADEv2Receiver directly rather than via rx2.py's CLI globals.
+add_test(NAME v2_rx2_receiver_vectors
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR} && \
+                       rm -f rx2_receiver_vectors.bin && \
+                       python3 generate_rx2_receiver_vectors.py rx2_receiver_vectors.bin > /dev/null && \
+                       test -s rx2_receiver_vectors.bin && \
+                       rm -f rx2_receiver_vectors.bin")
+
 # dealing with sample clock differences --------------------------
 
 # useful visualisation:
@@ -862,4 +871,3 @@ add_test(NAME v2_snr_est_low
                        --write_snr_est snr_est_low.f32; \
                        python3 check_snr_est.py \$SNR3K snr_est_low.f32 2.0")
          set_tests_properties(v2_snr_est_low PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
-

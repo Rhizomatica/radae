@@ -113,6 +113,7 @@ def main():
         auxdata=bool(args.auxdata),
         limit_pitch=bool(args.limit_pitch),
         mute=bool(args.mute),
+        fix_delta_hat=0,
         hangover=args.hangover,
         reset_output_on_resync=bool(args.reset_output_on_resync),
         timing_adj_at=args.timing_adj_at,

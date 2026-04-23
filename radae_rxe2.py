@@ -114,6 +114,7 @@ class radae_rx_v2:
             agc=agc_en, mute=mute_en, limit_pitch=limit_pitch,
             hangover=hangover, verbose=verbose,
             reset_output_on_resync=reset_output_on_resync,
+            fix_delta_hat=0,
         )
         self.args     = args
         self.receiver = RADEv2Receiver(self.model, self.frame_sync_nn, args)
