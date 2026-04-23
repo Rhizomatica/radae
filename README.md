@@ -22,9 +22,11 @@ The elimination of pilot symbols in V2 recovers the bandwidth and power they con
 
 # Scope
 
-This repo is intended to support the authors experimental work, with just enough information for the advanced experimenter to reproduce aspects of the work. The focus is on waveform development, not software configuration. It is not intended to be packaged for general use or to work across multiple Linux distros and operating systems - that will come later. Unless otherwise stated, the code is this repo is intended to run only on Ubuntu Linux 22-24 on a non-virtual machine.
+This repo is the reference Python implementation for RADE V1 and V2. The current focus is on RADE V2, however it also contains RADE V1 ctests.
 
-This branch is focussed on RADE V2, however it still contains RADE V1 and associated ctests. 
+This repo is intended to support experimental work, with just enough information for the advanced experimenter to reproduce aspects of the work. The focus is on waveform development, not software configuration. It is not intended to be packaged for general use or to work across multiple Linux distros and operating systems. Unless otherwise stated, the code is this repo is intended to run only on Ubuntu Linux 22-24 on a non-virtual machine.
+
+For deployment and distribution of RADE V1 and V2, please use the C ports.
 
 # Quickstart
 
@@ -33,8 +35,7 @@ This branch is focussed on RADE V2, however it still contains RADE V1 and associ
    ```
    ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/brian_g8sez.wav /dev/null --rate_Fs --latent-dim 56 \
     --peak --cp 0.004 --time_offset -16 --correct_time_offset -8 --auxdata --w1_dec 128 --write_rx 250725_rx.f32 
-   ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync 250725_rx.f32 test.wav --latent-dim 56 \
-   --w1_dec 128 --correct_time_offset -8
+   ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync 250725_rx.f32 test.wav
    play test.wav
    ```
 1. `test/v2_spot.sh` is a good starting point for experimentation.
