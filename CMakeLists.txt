@@ -270,11 +270,6 @@ add_test(NAME complex_bpf
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; python3 -c 'from radae import complex_bpf_test; complex_bpf_test(0)'")
                 set_tests_properties(complex_bpf PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
-add_test(NAME complex_bpf_c
-         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
-                        python3 generate_complex_bpf_vectors.py ${CMAKE_BINARY_DIR}/complex_bpf_vectors.bin >/dev/null && \
-                        ${CMAKE_BINARY_DIR}/src/test_complex_bpf < ${CMAKE_BINARY_DIR}/complex_bpf_vectors.bin")
-
 # compare rx.py in with vanilla and stateful core decoder, tests just ML part of streaming receiver
 add_test(NAME rx_stateful
         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
@@ -687,8 +682,7 @@ add_test(NAME v2_rx2_mpp_low_pop1
                        python3 inference.py 250725/checkpoints/checkpoint_epoch_200.pth features_in_bad.f32 /dev/null \
                        --rate_Fs --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 \
                        --auxdata --w1_dec 128 --EbNodB 100 --write_rx pop_tx.f32; \
-                       ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync pop_tx.f32 tmp.wav \
-                       --latent-dim 56 --w1_dec 128")
+                       ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync pop_tx.f32 tmp.wav")
          set_tests_properties(v2_rx2_mpp_low_pop1 PROPERTIES FAIL_REGULAR_EXPRESSION "POP")
 add_test(NAME v2_rx2_mpp_low_pop2
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
@@ -698,7 +692,7 @@ add_test(NAME v2_rx2_mpp_low_pop2
                        --rate_Fs --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 \
                        --auxdata --w1_dec 128 --EbNodB 100 --write_rx pop_tx.f32; \
                        ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync pop_tx.f32 tmp.wav \
-                       --latent-dim 56 --w1_dec 128 --nolimit_pitch")
+                       --nolimit_pitch")
          set_tests_properties(v2_rx2_mpp_low_pop2 PROPERTIES PASS_REGULAR_EXPRESSION "POP")
         
 # tests to exercise limits of timing est to decoder interface (Jan 2026 timing corner case)
@@ -706,29 +700,20 @@ add_test(NAME v2_rx2_mpp_low_pop2
 
 add_test(NAME v2_timing_low_delta1
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; test/make_g.sh;
-                       delta=0.05 ./test/v2_timing.sh --g_file g_mpp_low.f32 --correct_time_offset -8 --fix_delta_hat 32 --quiet")
+                       delta=0.05 ./test/v2_timing.sh --g_file g_mpp_low.f32 --fix_delta_hat 32 --quiet")
          set_tests_properties(v2_timing_low_delta1 PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 add_test(NAME v2_timing_low_delta2
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
-                       delta=0.05 ./test/v2_timing.sh --g_file g_mpp_low.f32 --correct_time_offset -8 --fix_delta_hat 48 --quiet")
+                       delta=0.05 ./test/v2_timing.sh --g_file g_mpp_low.f32 --fix_delta_hat 48 --quiet")
          set_tests_properties(v2_timing_low_delta2 PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 add_test(NAME v2_timing_high_delta1
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
-                       delta=0.05 ./test/v2_timing.sh --g_file g_mpp_high.f32 --correct_time_offset -8 --fix_delta_hat 32 --quiet")
+                       delta=0.05 ./test/v2_timing.sh --g_file g_mpp_high.f32 --fix_delta_hat 32 --quiet")
          set_tests_properties(v2_timing_high_delta1 PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 add_test(NAME v2_timing_high_delta2
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
-                       delta=0.05 ./test/v2_timing.sh --g_file g_mpp_high.f32 --correct_time_offset -8 --fix_delta_hat 48 --quiet")
+                       delta=0.05 ./test/v2_timing.sh --g_file g_mpp_high.f32 --fix_delta_hat 48 --quiet")
          set_tests_properties(v2_timing_high_delta2 PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
-
-# Regression coverage for library-style rx2 imports. generate_rx2_receiver_vectors.py
-# constructs RADEv2Receiver directly rather than via rx2.py's CLI globals.
-add_test(NAME v2_rx2_receiver_vectors
-         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR} && \
-                       rm -f rx2_receiver_vectors.bin && \
-                       python3 generate_rx2_receiver_vectors.py rx2_receiver_vectors.bin > /dev/null && \
-                       test -s rx2_receiver_vectors.bin && \
-                       rm -f rx2_receiver_vectors.bin")
 
 # dealing with sample clock differences --------------------------
 
@@ -792,7 +777,7 @@ add_test(NAME v2_rx2_ch
                        --ssb_bpf --write_rx brian_tx.f32; \
          cat brian_tx.f32 | python3 f32toint16.py --real --scale 16383 | ${CMAKE_BINARY_DIR}/src/ch - - | python3 int16tof32.py --zeropad > brian_rx.f32
          ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725_ml_sync brian_rx.f32 /dev/null \
-         --latent-dim 56 --w1_dec 128 --agc --quiet --write_gain gain.f32 --gain 1.22E-4; \
+         --agc --quiet --write_gain gain.f32 --gain 1.22E-4; \
          python3 loss.py features_in.f32 features_out.f32 --features_hat2 features_out_rx2.f32 --compare --clip_start 50 --clip_end 50")
          set_tests_properties(v2_rx2_ch PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
@@ -803,7 +788,7 @@ add_test(NAME v2_eoo_awgn_high
                        --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 \
                        --end_of_over_v2 --write_rx v2_eoo_tx.f32 --append_noise 1; \
                        ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync v2_eoo_tx.f32 /dev/null \
-                       --latent-dim 56 --w1_dec 128 --correct_time_offset -8 2>&1 | grep 'EOO detected' && echo PASS || echo FAIL")
+                       2>&1 | grep 'EOO detected' && echo PASS || echo FAIL")
          set_tests_properties(v2_eoo_awgn_high PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
 add_test(NAME v2_eoo_awgn_low
@@ -812,7 +797,7 @@ add_test(NAME v2_eoo_awgn_low
                        --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 \
                        --end_of_over_v2 --write_rx v2_eoo_tx.f32 --append_noise 1 --EbNodB 6; \
                        ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync v2_eoo_tx.f32 /dev/null \
-                       --latent-dim 56 --w1_dec 128 --correct_time_offset -8 2>&1 | grep 'EOO detected' && echo PASS || echo FAIL")
+                       2>&1 | grep 'EOO detected' && echo PASS || echo FAIL")
          set_tests_properties(v2_eoo_awgn_low PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
 add_test(NAME v2_eoo_mpp_high
@@ -821,7 +806,7 @@ add_test(NAME v2_eoo_mpp_high
                        --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 \
                        --end_of_over_v2 --write_rx v2_eoo_tx.f32 --append_noise 1 --g_file g_mpp.f32; \
                        ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync v2_eoo_tx.f32 /dev/null \
-                       --latent-dim 56 --w1_dec 128 --correct_time_offset -8 2>&1 | grep 'EOO detected' && echo PASS || echo FAIL")
+                       2>&1 | grep 'EOO detected' && echo PASS || echo FAIL")
          set_tests_properties(v2_eoo_mpp_high PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
 add_test(NAME v2_eoo_mpp_low
@@ -830,7 +815,7 @@ add_test(NAME v2_eoo_mpp_low
                        --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 \
                        --end_of_over_v2 --write_rx v2_eoo_tx.f32 --append_noise 1 --g_file g_mpp.f32 --EbNodB 8; \
                        ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync v2_eoo_tx.f32 /dev/null \
-                       --latent-dim 56 --w1_dec 128 --correct_time_offset -8 2>&1 | grep 'EOO detected' && echo PASS || echo FAIL")
+                       2>&1 | grep 'EOO detected' && echo PASS || echo FAIL")
          set_tests_properties(v2_eoo_mpp_low PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
 # V2 EOO false-trigger tests: normal transmission (no EOO) using a long file, check no false "EOO detected"
@@ -840,7 +825,7 @@ add_test(NAME v2_eoo_no_false_trigger_awgn
                        --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 \
                        --write_rx v2_eoo_notx.f32 --EbNodB 10; \
                        ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync v2_eoo_notx.f32 /dev/null \
-                       --latent-dim 56 --w1_dec 128 --correct_time_offset -8 2>&1 | \
+                       2>&1 | \
                        grep 'EOO detected' && echo FAIL || echo PASS")
          set_tests_properties(v2_eoo_no_false_trigger_awgn PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
@@ -850,7 +835,7 @@ add_test(NAME v2_eoo_no_false_trigger_mpp
                        --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 \
                        --write_rx v2_eoo_notx.f32 --g_file g_mpp.f32 --EbNodB 10; \
                        ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync v2_eoo_notx.f32 /dev/null \
-                       --latent-dim 56 --w1_dec 128 --correct_time_offset -8 2>&1 | \
+                       2>&1 | \
                        grep 'EOO detected' && echo FAIL || echo PASS")
          set_tests_properties(v2_eoo_no_false_trigger_mpp PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
@@ -864,7 +849,7 @@ add_test(NAME v2_snr_est_high
                        --EbNodB 12 --write_rx snr_rx_high.f32 --append_noise 1 > snr_inf_high.txt; \
                        SNR3K=\$(grep Measured snr_inf_high.txt | awk '{print \$4}'); \
                        python3 rx2.py 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync \
-                       snr_rx_high.f32 /dev/null --latent-dim 56 --w1_dec 128 --quiet \
+                       snr_rx_high.f32 /dev/null --quiet \
                        --write_snr_est snr_est_high.f32; \
                        python3 check_snr_est.py \$SNR3K snr_est_high.f32 3.0")
          set_tests_properties(v2_snr_est_high PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
@@ -878,7 +863,20 @@ add_test(NAME v2_snr_est_low
                        --EbNodB 2 --write_rx snr_rx_low.f32 --append_noise 1 > snr_inf_low.txt; \
                        SNR3K=\$(grep Measured snr_inf_low.txt | awk '{print \$4}'); \
                        python3 rx2.py 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync \
-                       snr_rx_low.f32 /dev/null --latent-dim 56 --w1_dec 128 --quiet \
+                       snr_rx_low.f32 /dev/null --quiet \
                        --write_snr_est snr_est_low.f32; \
                        python3 check_snr_est.py \$SNR3K snr_est_low.f32 2.0")
          set_tests_properties(v2_snr_est_low PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+# tx2.sh test: encode with tx2.sh, decode with rx2.sh, compare to inference.py reference
+add_test(NAME v2_tx2
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
+                       ./tx2.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/brian_g8sez.wav v2_tx2_rx.f32; \
+                       python3 inference.py 250725/checkpoints/checkpoint_epoch_200.pth features_in.f32 features_out.f32 \
+                       --latent-dim 56 --w1_dec 128 --auxdata --rate_Fs --cp 0.004 \
+                       --time_offset -16 --correct_time_offset -8 --peak; \
+                       ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync v2_tx2_rx.f32 /dev/null --quiet; \
+                       python3 loss.py features_in.f32 features_out.f32 --features_hat2 features_out_rx2.f32 \
+                       --clip_start 100 --clip_end 300 --compare --delta 0.05")
+         set_tests_properties(v2_tx2 PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+

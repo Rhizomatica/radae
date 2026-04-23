@@ -15,7 +15,7 @@ import torch
 import radae.radae_base as rb
 from radae import RADAE
 from models_sync import FrameSyncNet
-from rx2 import RADEv2Receiver
+from radae_v2 import RADEv2Receiver
 
 
 def remove_weight_norm(model):

@@ -43,7 +43,7 @@ import torch
 
 from radae import RADAE, complex_bpf
 from models_sync import FrameSyncNet
-from rx2 import ComfortNoiseGenerator, RADEv2Receiver
+from radae_v2 import ComfortNoiseGenerator, RADEv2Receiver
 
 
 NB_TOTAL_FEATURES = 36      # FARGAN/lpcnet feature vector size
