@@ -6,6 +6,7 @@
  *   int32      Ncp
  *   int32      sym_len
  *   int32      ncases
+ *   int32      fix_delta_hat     (0 = argmax; else pinned index)
  *   float32    Fs
  *   float32    B_bpf
  *   repeated ncases times:
@@ -41,12 +42,13 @@ int main(void) {
     _Static_assert(sizeof(COMP) == 2 * sizeof(float),
                    "COMP must be two packed float values");
 
-    int32_t M, Ncp, sym_len, ncases;
+    int32_t M, Ncp, sym_len, ncases, fix_delta_hat;
     float Fs, B_bpf;
     if (fread(&M, sizeof(M), 1, stdin) != 1 ||
         fread(&Ncp, sizeof(Ncp), 1, stdin) != 1 ||
         fread(&sym_len, sizeof(sym_len), 1, stdin) != 1 ||
         fread(&ncases, sizeof(ncases), 1, stdin) != 1 ||
+        fread(&fix_delta_hat, sizeof(fix_delta_hat), 1, stdin) != 1 ||
         fread(&Fs, sizeof(Fs), 1, stdin) != 1 ||
         fread(&B_bpf, sizeof(B_bpf), 1, stdin) != 1) {
         fprintf(stderr, "truncated header\n");
@@ -60,6 +62,12 @@ int main(void) {
     }
     if (sym_len != cs.sym_len) {
         fprintf(stderr, "sym_len mismatch header=%d init=%d\n", (int)sym_len, cs.sym_len);
+        rx2_coarse_sync_destroy(&cs);
+        return 1;
+    }
+    if (fix_delta_hat != 0 &&
+        rx2_coarse_sync_set_fix_delta_hat(&cs, fix_delta_hat) != 0) {
+        fprintf(stderr, "fix_delta_hat=%d out of range\n", (int)fix_delta_hat);
         rx2_coarse_sync_destroy(&cs);
         return 1;
     }

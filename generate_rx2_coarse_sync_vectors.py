@@ -6,6 +6,7 @@ Binary output layout:
     int32      Ncp
     int32      sym_len
     int32      ncases
+    int32      fix_delta_hat      # 0 = argmax (default); else pinned index
     float32    Fs
     float32    B_bpf
     repeated ncases times:
@@ -50,9 +51,12 @@ def compute_autocorr(rx_buf, M, Ncp, sym_len, Ry_smooth):
     return Ry_smooth.astype(np.complex64)
 
 
-def detect_signal(Ry_smooth, snr_offset_dB):
+def detect_signal(Ry_smooth, snr_offset_dB, fix_delta_hat=0):
     abs_Ry = np.abs(Ry_smooth)
-    delta_hat_g = int(np.argmax(abs_Ry))
+    if fix_delta_hat:
+        delta_hat_g = int(fix_delta_hat)
+    else:
+        delta_hat_g = int(np.argmax(abs_Ry))
     Ry_max = float(abs_Ry[delta_hat_g])
     Ry_min = float(abs_Ry[int(np.argmin(abs_Ry))])
     sig_det = int(Ry_max > TSIG)
@@ -99,6 +103,8 @@ def main():
     parser.add_argument("--B-bpf", dest="B_bpf", type=float, default=2600.0)
     parser.add_argument("--ncases", type=int, default=192)
     parser.add_argument("--seed", type=int, default=7)
+    parser.add_argument("--fix-delta-hat", dest="fix_delta_hat", type=int, default=0,
+                        help="pin delta_hat_g to this index (0 = argmax, matching rx2.py)")
     args = parser.parse_args()
 
     args.sym_len = args.M + args.Ncp
@@ -117,11 +123,16 @@ def main():
     Ry_smooth = np.zeros(args.sym_len, dtype=np.complex64)
     pos = 0
 
+    if args.fix_delta_hat and not (0 <= args.fix_delta_hat < args.sym_len):
+        print(f"fix_delta_hat must be in [0, {args.sym_len - 1}]", file=sys.stderr)
+        return 1
+
     with open(args.output, "wb") as f:
         f.write(np.int32(args.M).tobytes())
         f.write(np.int32(args.Ncp).tobytes())
         f.write(np.int32(args.sym_len).tobytes())
         f.write(np.int32(args.ncases).tobytes())
+        f.write(np.int32(args.fix_delta_hat).tobytes())
         f.write(np.float32(args.Fs).tobytes())
         f.write(np.float32(args.B_bpf).tobytes())
 
@@ -136,7 +147,7 @@ def main():
 
             Ry_smooth = compute_autocorr(rx_buf, args.M, args.Ncp, args.sym_len, Ry_smooth)
             delta_hat_g, Ry_max, Ry_min, sig_det, sine_det, snr_est_dB = detect_signal(
-                Ry_smooth, snr_offset_dB
+                Ry_smooth, snr_offset_dB, args.fix_delta_hat
             )
 
             f.write(rx_buf.tobytes())

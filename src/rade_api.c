@@ -463,6 +463,7 @@ struct rade *rade_rx_v2_pure_c_open(const char model_file[],
   cfg.hangover = 75;
   cfg.timing_adj_at = 16;
   cfg.reset_output_on_resync = 0;
+  cfg.fix_delta_hat = 0;   /* test knob (rx2.py --fix_delta_hat); off in prod */
   cfg.w = rx2_model_w;
   cfg.pend = rx2_model_pend;
   if (rx2_receiver_init(&r->rx2_receiver, &cfg) != 0) {

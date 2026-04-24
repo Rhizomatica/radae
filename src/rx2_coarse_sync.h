@@ -32,6 +32,7 @@ struct rx2_coarse_sync {
     float snr_corr_b;
     float snr_est_dB;
     int16_t delta_hat_g;
+    int16_t fix_delta_hat;
     float Ry_max;
     float Ry_min;
     COMP *Ry_norm;
@@ -68,6 +69,15 @@ int rx2_coarse_sync_detect(struct rx2_coarse_sync *cs, int *sig_det, int *sine_d
 /* Convenience wrapper: compute then detect. */
 int rx2_coarse_sync_apply(struct rx2_coarse_sync *cs, const COMP rx_buf[],
                           int *sig_det, int *sine_det);
+
+/*
+ * Pin delta_hat_g to a constant instead of argmax(|Ry_smooth|).  Mirrors
+ * rx2.py's --fix_delta_hat test knob.  A value of 0 disables pinning
+ * (i.e. argmax is used), so 0 is the production default.  Values must be
+ * in [0, sym_len-1]; returns -1 otherwise.  rho used for SNR estimation
+ * stays on the true peak magnitude, matching the Python reference.
+ */
+int rx2_coarse_sync_set_fix_delta_hat(struct rx2_coarse_sync *cs, int fix_delta_hat);
 
 #ifdef __cplusplus
 }

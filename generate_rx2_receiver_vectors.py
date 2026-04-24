@@ -71,6 +71,8 @@ def main():
     parser.add_argument("--reset-output-on-resync", type=int, default=0)
     parser.add_argument("--time-offset", type=int, default=-16)
     parser.add_argument("--correct-time-offset", type=int, default=-16)
+    parser.add_argument("--fix-delta-hat", type=int, default=0,
+                        help="pin delta_hat_g (0 = argmax, matching rx2.py)")
     parser.add_argument("--seed", type=int, default=7)
     args = parser.parse_args()
 
@@ -113,7 +115,7 @@ def main():
         auxdata=bool(args.auxdata),
         limit_pitch=bool(args.limit_pitch),
         mute=bool(args.mute),
-        fix_delta_hat=0,
+        fix_delta_hat=args.fix_delta_hat,
         hangover=args.hangover,
         reset_output_on_resync=bool(args.reset_output_on_resync),
         timing_adj_at=args.timing_adj_at,
@@ -186,6 +188,7 @@ def main():
             np.int32(args.hangover),
             np.int32(args.timing_adj_at),
             np.int32(args.reset_output_on_resync),
+            np.int32(args.fix_delta_hat),
             np.int32(model.M),
             np.int32(model.Ncp),
             np.int32(model.Ns),

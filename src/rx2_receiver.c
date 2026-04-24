@@ -52,7 +52,8 @@ static float comp_angle(COMP x) {
 }
 
 static int rx2_receiver_adjust_timing(struct rx2_receiver *rx, int nin) {
-    if (!rx || !rx->timing_tmp || !rx->coarse_sync.Ry_smooth || !rx->timing_adj) {
+    if (!rx || !rx->timing_tmp || !rx->coarse_sync.Ry_smooth || !rx->timing_adj ||
+        rx->coarse_sync.fix_delta_hat != 0) {
         return nin;
     }
 
@@ -114,6 +115,11 @@ int rx2_receiver_init(struct rx2_receiver *rx, const struct rx2_receiver_config 
                        cfg->Fs, cfg->time_offset, cfg->correct_time_offset, cfg->w) != 0 ||
         rx2_eoo_init(&rx->eoo, cfg->M, cfg->Ncp, cfg->pend) != 0 ||
         rx2_frame_sync_init(&rx->frame_sync, cfg->auxdata, cfg->limit_pitch, cfg->mute) != 0) {
+        rx2_receiver_destroy(rx);
+        return -1;
+    }
+    if (cfg->fix_delta_hat != 0 &&
+        rx2_coarse_sync_set_fix_delta_hat(&rx->coarse_sync, cfg->fix_delta_hat) != 0) {
         rx2_receiver_destroy(rx);
         return -1;
     }

@@ -44,6 +44,7 @@ struct rx2_receiver_config {
     int hangover;
     int timing_adj_at;
     int reset_output_on_resync;
+    int fix_delta_hat;
     const float *w;
     const COMP *pend;
 };

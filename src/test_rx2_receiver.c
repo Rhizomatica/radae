@@ -9,6 +9,7 @@
  *   int32      hangover
  *   int32      timing_adj_at
  *   int32      reset_output_on_resync
+ *   int32      fix_delta_hat
  *   int32      M
  *   int32      Ncp
  *   int32      Ns
@@ -69,6 +70,7 @@ static int read_comp_vec(COMP *dst, int n) {
 
 int main(void) {
     int32_t auxdata, agc, limit_pitch, mute, hangover, timing_adj_at, reset_output_on_resync;
+    int32_t fix_delta_hat;
     int32_t M, Ncp, Ns, Nc, time_offset, correct_time_offset, output_dim, ncases;
     float Fs, B_bpf;
     float *w = NULL;
@@ -89,6 +91,7 @@ int main(void) {
         fread(&hangover, sizeof(hangover), 1, stdin) != 1 ||
         fread(&timing_adj_at, sizeof(timing_adj_at), 1, stdin) != 1 ||
         fread(&reset_output_on_resync, sizeof(reset_output_on_resync), 1, stdin) != 1 ||
+        fread(&fix_delta_hat, sizeof(fix_delta_hat), 1, stdin) != 1 ||
         fread(&M, sizeof(M), 1, stdin) != 1 ||
         fread(&Ncp, sizeof(Ncp), 1, stdin) != 1 ||
         fread(&Ns, sizeof(Ns), 1, stdin) != 1 ||
@@ -143,6 +146,7 @@ int main(void) {
     cfg.hangover = hangover;
     cfg.timing_adj_at = timing_adj_at;
     cfg.reset_output_on_resync = reset_output_on_resync;
+    cfg.fix_delta_hat = fix_delta_hat;
     cfg.w = w;
     cfg.pend = pend;
     if (rx2_receiver_init(&rx, &cfg) != 0) {

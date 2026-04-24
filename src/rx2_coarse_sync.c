@@ -23,6 +23,7 @@ static void rx2_coarse_sync_zero(struct rx2_coarse_sync *cs) {
     cs->snr_corr_b = 0.0f;
     cs->snr_est_dB = 0.0f;
     cs->delta_hat_g = 0;
+    cs->fix_delta_hat = 0;
     cs->Ry_max = 0.0f;
     cs->Ry_min = 0.0f;
     cs->Ry_norm = NULL;
@@ -64,6 +65,7 @@ void rx2_coarse_sync_reset(struct rx2_coarse_sync *cs) {
     memset(cs->Ry_norm, 0, (size_t)cs->sym_len * sizeof(*cs->Ry_norm));
     memset(cs->Ry_smooth, 0, (size_t)cs->sym_len * sizeof(*cs->Ry_smooth));
     cs->delta_hat_g = 0;
+    /* fix_delta_hat is config, not runtime state — preserved across resets. */
     cs->Ry_max = 0.0f;
     cs->Ry_min = 0.0f;
     cs->snr_est_dB = 0.0f;
@@ -113,34 +115,46 @@ int rx2_coarse_sync_detect(struct rx2_coarse_sync *cs, int *sig_det, int *sine_d
     }
 
     int argmax = 0;
-    int argmin = 0;
-    float rho = 0.0f;
-    cs->Ry_max = comp_abs(cs->Ry_smooth[0]);
-    cs->Ry_min = cs->Ry_max;
+    float true_peak = comp_abs(cs->Ry_smooth[0]);
+    cs->Ry_min = true_peak;
 
     for (int i = 1; i < cs->sym_len; i++) {
         float mag = comp_abs(cs->Ry_smooth[i]);
-        if (mag > cs->Ry_max) {
-            cs->Ry_max = mag;
+        if (mag > true_peak) {
+            true_peak = mag;
             argmax = i;
         }
         if (mag < cs->Ry_min) {
             cs->Ry_min = mag;
-            argmin = i;
         }
     }
 
-    cs->delta_hat_g = (int16_t)argmax;
-    (void)argmin;
+    if (cs->fix_delta_hat != 0) {
+        cs->delta_hat_g = cs->fix_delta_hat;
+        cs->Ry_max = comp_abs(cs->Ry_smooth[cs->fix_delta_hat]);
+    } else {
+        cs->delta_hat_g = (int16_t)argmax;
+        cs->Ry_max = true_peak;
+    }
+
     *sig_det = cs->Ry_max > cs->TSIG;
     *sine_det = cs->Ry_max / (cs->Ry_min + 1e-12f) < cs->TSIN;
-    rho = fminf(cs->Ry_max, 1.0f - 1e-6f);
+
+    /* rho follows rx2.py: np.max(abs_Ry), not the pinned Ry_max. */
+    float rho = fminf(true_peak, 1.0f - 1e-6f);
     if (rho < 0.0f) {
         rho = 0.0f;
     }
     cs->snr_est_dB = cs->snr_corr_a
                    * (10.0f * log10f(rho / (1.0f - rho) + 1e-12f) - cs->snr_offset_dB)
                    + cs->snr_corr_b;
+    return 0;
+}
+
+int rx2_coarse_sync_set_fix_delta_hat(struct rx2_coarse_sync *cs, int fix_delta_hat) {
+    if (!cs) return -1;
+    if (fix_delta_hat < 0 || fix_delta_hat >= cs->sym_len) return -1;
+    cs->fix_delta_hat = (int16_t)fix_delta_hat;
     return 0;
 }
 
