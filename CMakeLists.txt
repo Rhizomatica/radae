@@ -874,3 +874,22 @@ add_test(NAME v2_tx2
                        --clip_start 100 --clip_end 300 --compare --delta 0.05")
          set_tests_properties(v2_tx2 PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
+# tx2.sh channel test: tx2->ch->rx2 vs inference->ch->rx2, verifies tx2 matches inference under channel impairments
+# --No 36 gives approximately 10 dB SNR3k for --scale 16383 peak-normalised RADE V2 signal (RMS~11172)
+#add_test(NAME v2_tx2_ch
+#         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
+#                       ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/brian_g8sez.wav /dev/null \
+#                       --rate_Fs --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -8 \
+#                       --auxdata --w1_dec 128 --ssb_bpf --write_rx v2_tx2ch_inf.f32; \
+#                       cat v2_tx2ch_inf.f32 | python3 f32toint16.py --real --scale 16383 | ${CMAKE_BINARY_DIR}/src/ch - - --No 36 | python3 int16tof32.py --zeropad > v2_tx2ch_inf_rx.f32; \
+#                       ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync v2_tx2ch_inf_rx.f32 /dev/null \
+#                       --agc --gain 1.22E-4 --quiet; \
+#                       cp features_out_rx2.f32 features_out_rx2_inf.f32; \
+#                       ./tx2.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/brian_g8sez.wav v2_tx2ch_tx.f32 --ssb_bpf; \
+#                       cat v2_tx2ch_tx.f32 | python3 f32toint16.py --real --scale 16383 | ${CMAKE_BINARY_DIR}/src/ch - - --No 36 | python3 int16tof32.py --zeropad > v2_tx2ch_rx.f32; \
+#                       ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync v2_tx2ch_rx.f32 /dev/null \
+#                       --agc --gain 1.22E-4 --quiet; \
+#                       python3 loss.py features_in.f32 features_out_rx2_inf.f32 --features_hat2 features_out_rx2.f32 \
+#                       --compare --clip_start 50 --clip_end 50 --delta 0.1")
+#         set_tests_properties(v2_tx2_ch PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
