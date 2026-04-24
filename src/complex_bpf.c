@@ -50,8 +50,8 @@ void complex_bpf_destroy(struct complex_bpf *bpf) {
 
 void complex_bpf_reset(struct complex_bpf *bpf) {
     if (!bpf) return;
-    if (bpf->mem) {
-        memset(bpf->mem, 0, (size_t)(bpf->ntap + 1) * sizeof(*bpf->mem));
+    if (bpf->mem && bpf->ntap > 1) {
+        memset(bpf->mem, 0, (size_t)(bpf->ntap - 1) * sizeof(*bpf->mem));
     }
     bpf->mem_len = bpf->ntap > 0 ? bpf->ntap - 1 : 0;
     bpf->phase.real = 1.0f;
@@ -70,9 +70,10 @@ int complex_bpf_init(struct complex_bpf *bpf, int ntap, float Fs_Hz,
     bpf->max_len = max_len;
     bpf->alpha = 2.0f * (float)M_PI * centre_freq_Hz / Fs_Hz;
 
+    size_t mem_cap = (size_t)(ntap > 1 ? ntap - 1 : 1);
     bpf->h = (COMP *)calloc((size_t)ntap, sizeof(*bpf->h));
-    bpf->mem = (COMP *)calloc((size_t)(ntap + 1), sizeof(*bpf->mem));
-    bpf->x_mem = (COMP *)calloc((size_t)(ntap + max_len + 1), sizeof(*bpf->x_mem));
+    bpf->mem = (COMP *)calloc(mem_cap, sizeof(*bpf->mem));
+    bpf->x_mem = (COMP *)calloc((size_t)(ntap + max_len - 1), sizeof(*bpf->x_mem));
     bpf->x_filt = (COMP *)calloc((size_t)max_len, sizeof(*bpf->x_filt));
     bpf->phase_vec_exp = (COMP *)calloc((size_t)max_len, sizeof(*bpf->phase_vec_exp));
     bpf->phase_vec = (COMP *)calloc((size_t)max_len, sizeof(*bpf->phase_vec));
@@ -122,9 +123,12 @@ int complex_bpf_process(struct complex_bpf *bpf, const COMP x[], int n, COMP y[]
     }
 
     int valid_len = bpf->mem_len + n;
-    int new_mem_len = valid_len < (bpf->ntap + 1) ? valid_len : (bpf->ntap + 1);
-    memcpy(bpf->mem, &bpf->x_mem[valid_len - new_mem_len],
-           (size_t)new_mem_len * sizeof(*bpf->mem));
+    int target_mem_len = bpf->ntap > 1 ? bpf->ntap - 1 : 0;
+    int new_mem_len = valid_len < target_mem_len ? valid_len : target_mem_len;
+    if (new_mem_len > 0) {
+        memcpy(bpf->mem, &bpf->x_mem[valid_len - new_mem_len],
+               (size_t)new_mem_len * sizeof(*bpf->mem));
+    }
     bpf->mem_len = new_mem_len;
     bpf->phase = bpf->phase_vec[n - 1];
 

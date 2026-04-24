@@ -264,6 +264,11 @@ add_test(NAME complex_bpf
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; python3 -c 'from radae import complex_bpf_test; complex_bpf_test(0)'")
                 set_tests_properties(complex_bpf PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
+add_test(NAME complex_bpf_c
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
+                        python3 generate_complex_bpf_vectors.py ${CMAKE_BINARY_DIR}/complex_bpf_vectors.bin >/dev/null && \
+                        ${CMAKE_BINARY_DIR}/src/test_complex_bpf < ${CMAKE_BINARY_DIR}/complex_bpf_vectors.bin")
+
 # compare rx.py in with vanilla and stateful core decoder, tests just ML part of streaming receiver
 add_test(NAME rx_stateful
         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
