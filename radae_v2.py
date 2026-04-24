@@ -302,7 +302,7 @@ class RADEv2Receiver:
          self.Ry_smooth = 0
          return "idle", None
 
-      features_hat = self._update_frame_sync(az_hat, sig_det, sine_det)
+      features_hat = self._update_frame_sync_and_decode(az_hat, sig_det, sine_det)
 
       return next_state, features_hat
 
@@ -336,7 +336,7 @@ class RADEv2Receiver:
       self.eoo_smooth = self.ALPHA_EOO * self.eoo_smooth + (1.0 - self.ALPHA_EOO) * self._eoo_corr
       return self.eoo_smooth > self.TEOO
 
-   def _update_frame_sync(self, az_hat, sig_det, sine_det):
+   def _update_frame_sync_and_decode(self, az_hat, sig_det, sine_det):
       """Update odd/even metrics. Returns decoded features_hat if winning frame, else None."""
       metric = float(self.frame_sync_nn(az_hat)[0, 0, 0].detach())
       gamma  = self.BETA
@@ -390,3 +390,79 @@ class RADEv2Receiver:
          f"eoo: {self.eoo_smooth:.3f} corr: {self._eoo_corr:.3f}",
          file=sys.stderr
       )
+
+
+class RADEv2Transmitter:
+   """RADE V2 stateful streaming transmitter.
+
+   Encodes enc_stride (4) feature vectors per call and modulates to Ns (2)
+   OFDM symbols at rate Fs — one modem frame at a time.
+
+   The stateful encoder weights must be transferred before use:
+      model.core_encoder_statefull_load_state_dict()
+
+   Usage:
+      tx = RADEv2Transmitter(model)
+      for each block of enc_stride feature vectors:
+          samples = tx.transmit_frame(features)   # numpy complex64
+      if end_of_over:
+          samples = tx.eoo()
+   """
+
+   def __init__(self, model):
+      self.model      = model
+      self.M          = model.M
+      self.Ncp        = model.Ncp
+      self.Ns         = model.Ns
+      self.Nc         = model.Nc
+      self.sym_len    = model.M + model.Ncp
+      self.enc_stride = model.enc_stride
+
+      self.ssb_bpf_en = model.ssb_bpf
+      if self.ssb_bpf_en:
+         # Streaming complex BPF with same parameters as model
+         from radae import complex_bpf as ComplexBPF
+         Ntap      = 101
+         w         = model.w.cpu().numpy()
+         Fs        = float(model.Fs)
+         bandwidth = 1.2 * (w[model.Nc - 1] - w[0]) * Fs / (2 * np.pi)
+         centre    = (w[model.Nc - 1] + w[0]) * Fs / (2 * np.pi) / 2
+         frame_len = self.Ns * self.sym_len
+         self._ssb_bpf = ComplexBPF(Ntap, Fs, bandwidth, centre, frame_len)
+
+   def transmit_frame(self, features):
+      """Encode one frame and modulate to OFDM IQ samples.
+
+      Args:
+         features: torch.Tensor of shape (1, enc_stride, num_features)
+
+      Returns:
+         numpy.ndarray of complex64 IQ samples, shape (Ns * sym_len,)
+      """
+      with torch.no_grad():
+         # Stateful encoder: (1, enc_stride, num_features) -> (1, 1, latent_dim)
+         z = self.model.core_encoder_statefull(features)
+         self.last_z = z
+
+         # Map real latent to complex QPSK symbols: latent_dim/2 = Ns*Nc
+         tx_sym = z[:, :, ::2] + 1j * z[:, :, 1::2]   # (1, 1, Ns*Nc)
+
+         # Reshape to (1, Ns, Nc) then IDFT -> (1, Ns, M)
+         tx_sym = torch.reshape(tx_sym, (1, self.Ns, self.Nc))
+         tx = torch.matmul(tx_sym, self.model.Winv)
+
+         # Insert cyclic prefix: (1, Ns, M) -> (1, Ns, sym_len)
+         tx_cp = torch.zeros((1, self.Ns, self.sym_len), dtype=torch.complex64)
+         tx_cp[:, :, self.Ncp:] = tx
+         tx_cp[:, :, :self.Ncp] = tx[:, :, -self.Ncp:]
+
+         tx = torch.reshape(tx_cp, (self.Ns * self.sym_len,)).numpy().astype(np.csingle)
+
+      if self.ssb_bpf_en:
+         tx = self._ssb_bpf.bpf(tx)
+
+      return tx
+
+   def eoo(self):
+      """Return the V2 end-of-over sequence as complex64 IQ samples."""
+      return self.model.eoo_v2.numpy().flatten().astype(np.csingle)
