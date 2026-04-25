@@ -529,10 +529,10 @@ struct rade *rade_tx_v2_pure_c_open(const char model_file[], int flags) {
   r->flags = flags;
   rade_set_common_feature_meta(r);
 
-  /* auxdata=1 (production), txbpf=0 (production).  txbpf would need the
-   * complex_bpf streaming-state fix mirrored from Python commit c42466d
-   * before being safe to enable here; out of scope for this backend. */
-  if (tx2_encode_init(&r->tx2_encode, 1, 0) != 0) {
+  /* auxdata=1 (production); txbpf opt-in via RADE_TX_V2_USE_BPF since
+   * Hermes production does not enable it. */
+  int txbpf_en = (flags & RADE_TX_V2_USE_BPF) ? 1 : 0;
+  if (tx2_encode_init(&r->tx2_encode, 1, txbpf_en) != 0) {
     free(r);
     return NULL;
   }

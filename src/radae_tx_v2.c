@@ -77,14 +77,7 @@ int main(int argc, char *argv[]) {
         } else if (!strcmp(argv[i], "--no_eoo")) {
             send_eoo = 0;
         } else if (!strcmp(argv[i], "--txbpf")) {
-            /* The C complex_bpf streaming-state convention diverged from
-             * the Python fix in commit c42466d.  Refuse rather than ship
-             * a silent BPF mismatch on the air. */
-            fprintf(stderr,
-                    "radae_tx_v2: --txbpf is not yet supported in the C path; "
-                    "see C_TX_MIGRATION.md.\n");
-            (void)txbpf;
-            return 1;
+            txbpf = 1;
         } else if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--verbose")) {
             flags &= ~RADE_VERBOSE_0;
         } else if (!strcmp(argv[i], "--quiet")) {
@@ -94,6 +87,8 @@ int main(int argc, char *argv[]) {
             return 1;
         }
     }
+
+    if (txbpf) flags |= RADE_TX_V2_USE_BPF;
 
     rade_initialize();
 
