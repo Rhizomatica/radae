@@ -75,6 +75,9 @@ extern "C" {
 #define RADE_RX_V2_COMPILED_MODEL_NAME "250725/checkpoints/checkpoint_epoch_200.pth"
 #define RADE_RX_V2_COMPILED_FRAME_SYNC_MODEL_NAME "250725a_ml_sync"
 
+// Compiled-in identifier used by the pure-C RADEv2 TX path.
+#define RADE_TX_V2_COMPILED_MODEL_NAME "250725/checkpoints/checkpoint_epoch_200.pth"
+
 // init rade_open() flags
 #define RADE_USE_C_ENCODER 0x1
 #define RADE_USE_C_DECODER 0x2
@@ -100,6 +103,17 @@ RADE_EXPORT struct rade *rade_open(char model_file[], int flags);
  */
 RADE_EXPORT struct rade *rade_rx_v2_pure_c_open(const char model_file[],
                                                 const char frame_sync_model_file[],
+                                                int flags);
+/*
+ * Open the RADEv2 pure-C TX path backed by compiled-in weights.
+ *
+ * model_file is accepted for API compatibility with the Python V2 wrapper
+ * but it must be empty/NULL or match RADE_TX_V2_COMPILED_MODEL_NAME above.
+ * This path always uses the built-in 250725 / 56-dim model export, with
+ * auxdata=True / bottleneck=3 / Nzmf=1 / txbpf=False (production
+ * invariants -- see C_TX_MIGRATION.md).
+ */
+RADE_EXPORT struct rade *rade_tx_v2_pure_c_open(const char model_file[],
                                                 int flags);
 RADE_EXPORT void rade_close(struct rade *r);
 

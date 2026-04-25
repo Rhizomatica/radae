@@ -58,6 +58,7 @@
 #include "complex_bpf.h"
 #include "rx2_model_data.h"
 #include "rx2_receiver.h"
+#include "tx2_encode.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -74,7 +75,8 @@ static PyThreadState* main_thread_state; // needed to unlock the GIL after initi
 
 enum rade_backend {
   RADE_BACKEND_LEGACY = 0,
-  RADE_BACKEND_RX_V2_PURE_C = 1
+  RADE_BACKEND_RX_V2_PURE_C = 1,
+  RADE_BACKEND_TX_V2_PURE_C = 2
 };
 
 struct rade {
@@ -115,6 +117,7 @@ struct rade {
   int rx2_bpf_en;
   RADE_COMP *rx2_bpf_out;
   struct rx2_receiver rx2_receiver;
+  struct tx2_encode tx2_encode;
 };
 
 static void rade_set_common_feature_meta(struct rade *r) {
@@ -128,6 +131,16 @@ static void rade_set_common_feature_meta(struct rade *r) {
 static int rade_is_compiled_rx_v2_identifier(const char requested[],
                                              const char compiled_in[]) {
   return requested == NULL || requested[0] == '\0' || strcmp(requested, compiled_in) == 0;
+}
+
+static int rade_validate_tx_v2_model_paths(const char model_file[]) {
+  if (!rade_is_compiled_rx_v2_identifier(model_file, RADE_TX_V2_COMPILED_MODEL_NAME)) {
+    fprintf(stderr,
+            "rade_tx_v2_pure_c_open: requested model \"%s\" does not match compiled-in model \"%s\"\n",
+            model_file, RADE_TX_V2_COMPILED_MODEL_NAME);
+    return -1;
+  }
+  return 0;
 }
 
 static int rade_validate_rx_v2_model_paths(const char model_file[],
@@ -501,6 +514,53 @@ struct rade *rade_rx_v2_pure_c_open(const char model_file[],
   return r;
 }
 
+struct rade *rade_tx_v2_pure_c_open(const char model_file[], int flags) {
+  struct rade *r;
+
+  if (rade_validate_tx_v2_model_paths(model_file) != 0) {
+    return NULL;
+  }
+
+  r = (struct rade *)calloc(1, sizeof(struct rade));
+  if (r == NULL) {
+    return NULL;
+  }
+  r->backend = RADE_BACKEND_TX_V2_PURE_C;
+  r->flags = flags;
+  rade_set_common_feature_meta(r);
+
+  /* auxdata=1 (production), txbpf=0 (production).  txbpf would need the
+   * complex_bpf streaming-state fix mirrored from Python commit c42466d
+   * before being safe to enable here; out of scope for this backend. */
+  if (tx2_encode_init(&r->tx2_encode, 1, 0) != 0) {
+    free(r);
+    return NULL;
+  }
+
+  /* TX feature contract mirrors radae_txe2.py:
+   *   n_features_in  = Nzmf * enc_stride * 36   (lpcnet_demo on the wire)
+   *   n_floats_in    = same                      (rade_tx pre-pack)
+   *   Nmf            = TX2_MODEL_NMF
+   *   Neoo           = TX2_MODEL_NEOO
+   *   n_eoo_bits     = 0                         (V2 EOO has no payload)
+   */
+  r->n_features_in = TX2_N_FEATURES_IN;
+  r->n_floats_in = TX2_N_FEATURES_IN;
+  r->Nmf = TX2_MODEL_NMF;
+  r->Neoo = TX2_MODEL_NEOO;
+  r->n_eoo_bits = 0;
+  /* RX-side fields are unused on a TX-only backend; leave them zero. */
+  r->nin = 0;
+  r->nin_max = 0;
+  r->n_features_out = 0;
+  r->n_floats_out = 0;
+  r->sync = 0;
+  r->snr = 0;
+  r->freq_offset = 0.0f;
+
+  return r;
+}
+
 void rade_close(struct rade *r) {
   if (!r) return;
   if (r->backend == RADE_BACKEND_LEGACY) {
@@ -516,6 +576,8 @@ void rade_close(struct rade *r) {
     complex_bpf_destroy(&r->rx2_bpf);
     free(r->rx2_bpf_out);
     rx2_receiver_destroy(&r->rx2_receiver);
+  } else if (r->backend == RADE_BACKEND_TX_V2_PURE_C) {
+    tx2_encode_destroy(&r->tx2_encode);
   }
   free(r);
 }
@@ -530,6 +592,13 @@ int rade_n_eoo_bits(struct rade *r) { assert(r != NULL);  return r->n_eoo_bits; 
 
 RADE_EXPORT void rade_tx_set_eoo_bits(struct rade *r, float eoo_bits[]) {
   assert(r != NULL);
+  if (r->backend == RADE_BACKEND_TX_V2_PURE_C) {
+    /* V2 EOO is a precomputed waveform with no soft-bit payload; nothing
+     * to set here.  Quietly accept the call so legacy callers that always
+     * push EOO bits before each over keep working with the V2 backend. */
+    (void)eoo_bits;
+    return;
+  }
   assert(r->backend == RADE_BACKEND_LEGACY);
   assert(eoo_bits != NULL);
   PyGILState_STATE gstate = PyGILState_Ensure();
@@ -541,9 +610,16 @@ RADE_EXPORT void rade_tx_set_eoo_bits(struct rade *r, float eoo_bits[]) {
 
 int rade_tx(struct rade *r, RADE_COMP tx_out[], float floats_in[]) {
   assert(r != NULL);
-  assert(r->backend == RADE_BACKEND_LEGACY);
   assert(floats_in != NULL);
   assert(tx_out != NULL);
+
+  if (r->backend == RADE_BACKEND_TX_V2_PURE_C) {
+    if (tx2_encode_frame(&r->tx2_encode, floats_in, (COMP *)tx_out) != 0) {
+      return 0;
+    }
+    return (int)r->Nmf;
+  }
+  assert(r->backend == RADE_BACKEND_LEGACY);
 
   // Acquire the Python GIL (needed for multithreaded use)
   PyGILState_STATE gstate = PyGILState_Ensure();
@@ -586,8 +662,15 @@ int rade_tx(struct rade *r, RADE_COMP tx_out[], float floats_in[]) {
 
 int rade_tx_eoo(struct rade *r, RADE_COMP tx_eoo_out[]) {
   assert(r != NULL);
-  assert(r->backend == RADE_BACKEND_LEGACY);
   assert(tx_eoo_out != NULL);
+
+  if (r->backend == RADE_BACKEND_TX_V2_PURE_C) {
+    if (tx2_encode_eoo(&r->tx2_encode, (COMP *)tx_eoo_out) != 0) {
+      return 0;
+    }
+    return (int)r->Neoo;
+  }
+  assert(r->backend == RADE_BACKEND_LEGACY);
 
   // Acquire the Python GIL (needed for multithreaded use)
   PyGILState_STATE gstate = PyGILState_Ensure();

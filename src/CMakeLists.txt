@@ -15,7 +15,9 @@ set(RADE_PURE_C_RX_SOURCES
     rx2_eoo.c
     rx2_frame_sync.c
     rx2_receiver.c
-    rx2_model_data.c)
+    rx2_model_data.c
+    tx2_encode.c
+    tx2_model_data.c)
 
 add_executable(ch ch.c ch_fdmdv.c)
 target_link_libraries(ch m)
@@ -41,7 +43,9 @@ add_library(rade
     rx2_eoo.c
     rx2_frame_sync.c
     rx2_receiver.c
-    rx2_model_data.c)
+    rx2_model_data.c
+    tx2_encode.c
+    tx2_model_data.c)
 if(APPLE OR WIN32)
 target_link_libraries(rade Python3::Python opus)
 else(APPLE OR WIN32)
@@ -68,6 +72,11 @@ target_include_directories(radae_rx PRIVATE
 add_executable(radae_rx_v2 radae_rx_v2.c ${RADE_PURE_C_RX_SOURCES})
 target_link_libraries(radae_rx_v2 opus m Python3::Python)
 target_include_directories(radae_rx_v2 PRIVATE
+    "$<TARGET_PROPERTY:Python3::NumPy,INTERFACE_INCLUDE_DIRECTORIES>")
+
+add_executable(radae_tx_v2 radae_tx_v2.c ${RADE_PURE_C_RX_SOURCES})
+target_link_libraries(radae_tx_v2 opus m Python3::Python)
+target_include_directories(radae_tx_v2 PRIVATE
     "$<TARGET_PROPERTY:Python3::NumPy,INTERFACE_INCLUDE_DIRECTORIES>")
 
 if (NOT WIN32)
