@@ -86,11 +86,11 @@ f"""
 
 
     encoder_gru_layers = [
-        ('core_encoder.module.gru1'       , 'enc_gru1',   'TANH', True),
-        ('core_encoder.module.gru2'       , 'enc_gru2',   'TANH', True),
-        ('core_encoder.module.gru3'       , 'enc_gru3',   'TANH', True),
-        ('core_encoder.module.gru4'       , 'enc_gru4',   'TANH', True),
-        ('core_encoder.module.gru5'       , 'enc_gru5',   'TANH', True),
+        ('core_encoder.module.gru1'       , 'enc_gru1',   'TANH', False),
+        ('core_encoder.module.gru2'       , 'enc_gru2',   'TANH', False),
+        ('core_encoder.module.gru3'       , 'enc_gru3',   'TANH', False),
+        ('core_encoder.module.gru4'       , 'enc_gru4',   'TANH', False),
+        ('core_encoder.module.gru5'       , 'enc_gru5',   'TANH', False),
     ]
 
     enc_max_rnn_units = max([dump_torch_weights(enc_writer, model.get_submodule(name), export_name, verbose=True, input_sparse=True, quantize=quantize, scale=None, recurrent_scale=None)
@@ -98,11 +98,11 @@ f"""
 
 
     encoder_conv_layers = [
-        ('core_encoder.module.conv1.conv'       , 'enc_conv1',   'TANH', True),
-        ('core_encoder.module.conv2.conv'       , 'enc_conv2',   'TANH', True),
-        ('core_encoder.module.conv3.conv'       , 'enc_conv3',   'TANH', True),
-        ('core_encoder.module.conv4.conv'       , 'enc_conv4',   'TANH', True),
-        ('core_encoder.module.conv5.conv'       , 'enc_conv5',   'TANH', True),
+        ('core_encoder.module.conv1.conv'       , 'enc_conv1',   'TANH', False),
+        ('core_encoder.module.conv2.conv'       , 'enc_conv2',   'TANH', False),
+        ('core_encoder.module.conv3.conv'       , 'enc_conv3',   'TANH', False),
+        ('core_encoder.module.conv4.conv'       , 'enc_conv4',   'TANH', False),
+        ('core_encoder.module.conv5.conv'       , 'enc_conv5',   'TANH', False),
     ]
 
     enc_max_conv_inputs = max([dump_torch_weights(enc_writer, model.get_submodule(name), export_name, verbose=True, quantize=quantize, scale=None) for name, export_name, _, quantize in encoder_conv_layers])

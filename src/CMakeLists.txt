@@ -116,6 +116,15 @@ add_executable(test_rade_rx_v2 test_rade_rx_v2.c ${RADE_PURE_C_RX_SOURCES})
 target_link_libraries(test_rade_rx_v2 opus m Python3::Python)
 target_include_directories(test_rade_rx_v2 PRIVATE
     "$<TARGET_PROPERTY:Python3::NumPy,INTERFACE_INCLUDE_DIRECTORIES>")
+
+add_executable(test_tx2_encode
+    test_tx2_encode.c
+    tx2_encode.c
+    tx2_model_data.c
+    complex_bpf.c
+    rade_enc.c
+    rade_enc_data.c)
+target_link_libraries(test_tx2_encode opus m)
 endif (NOT WIN32)
 
 add_executable(write_rade_weights write_rade_weights.c)
