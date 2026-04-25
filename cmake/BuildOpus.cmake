@@ -1,6 +1,15 @@
-message(STATUS "Will build opus with FARGAN")
+message(STATUS "Will build opus with FARGAN (HIGH_ACCURACY=on)")
 
-set(CONFIGURE_COMMAND ./autogen.sh && ./configure --enable-osce --enable-dred --disable-shared --disable-doc --disable-extra-programs)
+# HIGH_ACCURACY swaps opus's polynomial tanh/sigmoid for the libm
+# tanh()/exp() in dnn/nnet_arch.h.  Required for parity against PyTorch:
+# with the polynomial path the V2 encoder accumulates ~0.1 of latent
+# drift across the 11-layer DenseNet stack, which the bottleneck=3 unit
+# clipper amplifies into ~0.13 IQ-sample errors at the TX output.
+# CPPFLAGS is preferred over CFLAGS so opus's own optimisation flags
+# stay intact.
+set(OPUS_EXTRA_CPPFLAGS "-DHIGH_ACCURACY")
+
+set(CONFIGURE_COMMAND ./autogen.sh && ./configure --enable-osce --enable-dred --disable-shared --disable-doc --disable-extra-programs CPPFLAGS=${OPUS_EXTRA_CPPFLAGS})
 
 if (CMAKE_CROSSCOMPILING)
 set(CONFIGURE_COMMAND ${CONFIGURE_COMMAND} --host=${CMAKE_C_COMPILER_TARGET} --target=${CMAKE_C_COMPILER_TARGET})

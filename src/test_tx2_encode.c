@@ -25,23 +25,19 @@
 #include "tx2_encode.h"
 
 /*
- * The compiled-in encoder uses opus's nnet.c polynomial tanh approximation,
- * which diverges from PyTorch's libm tanh by ~2.4e-3 per layer.  Across the
- * 11-layer DenseNet stack that grows to ~0.1 in the latent vector, and the
- * downstream bottleneck=3 clipper amplifies tiny IQ deviations near zero
- * into possibly large angular deltas on unit-magnitude samples.  Bit-exact
- * parity against Python is therefore impossible by design.  TX_TOL is set
- * to catch *structural* bugs (off-by-one, swapped indices, sign errors)
- * without false-positiving on the known tanh approximation drift; the
- * end-to-end correctness measure is the on-air decode, not this tolerance.
+ * Parity tolerances assuming HIGH_ACCURACY libopus (libm tanh/exp via
+ * BuildOpus.cmake's -DHIGH_ACCURACY).  Without that flag the polynomial
+ * tanh path accumulates ~0.1 of latent drift across the 11-layer
+ * DenseNet stack and the clipper amplifies it to ~0.13 IQ-sample
+ * errors -- this test would need TX_TOL >= 0.5 to pass in that mode.
  *
- * EOO bit-accuracy is achievable when txbpf is off (constants-only path);
- * with txbpf on the BPF accumulates ~3e-3 of numerical drift, so we use a
- * looser tolerance that still validates the BPF wiring.
+ * With HIGH_ACCURACY observed on Pi 4 + x86_64:
+ *   txbpf=False  tx_max ~1.6e-5  eoo_max ~1.3e-7  (single-ULP)
+ *   txbpf=True   tx_max ~3.9e-6  eoo_max ~9.0e-7  (single-ULP)
  */
-#define TX_TOL          5e-1f
-#define EOO_TOL_NOBPF   1e-6f
-#define EOO_TOL_BPF     1e-2f
+#define TX_TOL          5e-4f
+#define EOO_TOL_NOBPF   5e-6f
+#define EOO_TOL_BPF     5e-5f
 
 static float comp_abs_err(COMP a, COMP b) {
     float dr = a.real - b.real;
