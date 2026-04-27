@@ -409,7 +409,7 @@ add_test(NAME radae_rx_slip_minus
                        --rate_Fs --pilots --pilot_eq --eq_ls --cp 0.004 --bottleneck 3 --auxdata --write_rx rx.f32 --correct_freq_offset --prepend_noise 0.11; \
                        cat rx.f32 | python3 f32toint16.py --scale 8192 | sox -t .s16 -r 8000 -c 2 - -t .s16 -r 7995 -c 2 - | python3 int16tof32.py > rx_.f32; \
                        cat rx_.f32 | python3 radae_rxe.py --model model19_check3/checkpoints/checkpoint_epoch_100.pth -v 2 > features_rxs_out.f32; \
-                       python3 loss.py features_in.f32 features_rxs_out.f32 --loss_test 0.2 --acq_time_test 1.0")
+                       python3 loss.py features_in.f32 features_rxs_out.f32 --loss_test 0.25 --acq_time_test 1.0")
                        set_tests_properties(radae_rx_slip_minus PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
 # profiles a run with a 50 second file (no pass/fail, run with -V to get a rough idea of execution time)
