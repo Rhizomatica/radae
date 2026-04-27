@@ -96,7 +96,7 @@ void free_blob(unsigned char *blob, int len) {
 
 void usage(void) {
     fprintf(stderr, "usage: lpcnet_demo -features <input.pcm> <features.f32>\n");
-    fprintf(stderr, "       lpcnet_demo -fargan-synthesis <features.f32> <output.pcm>\n");
+    fprintf(stderr, "       lpcnet_demo -fargan-synthesis [--pop] <features.f32> <output.pcm>\n");
     fprintf(stderr, "       lpcnet_demo -addlpc <features_without_lpc.f32> <features_with_lpc.lpc>\n\n");
     fprintf(stderr, "  plc_options:\n");
     fprintf(stderr, "       causal:       normal (causal) PLC\n");
@@ -107,6 +107,7 @@ void usage(void) {
 int main(int argc, char **argv) {
     int mode=0;
     int arch;
+    int pop_detect=0;
     FILE *fin, *fout;
 #ifdef USE_WEIGHTS_FILE
     int len;
@@ -123,6 +124,12 @@ int main(int argc, char **argv) {
         usage();
     }
 
+    if (argc == 5 && strcmp(argv[2], "--pop") == 0) {
+        pop_detect = 1;
+        argv[2] = argv[3];
+        argv[3] = argv[4];
+        argc = 4;
+    }
     if (argc != 4) usage();
 
     if (strcmp(argv[2], "-") == 0)
@@ -195,6 +202,9 @@ int main(int argc, char **argv) {
             if (feof(fin) || ret != NB_TOTAL_FEATURES) break;
             OPUS_COPY(features, in_features, NB_FEATURES);
             fargan_synthesize(&fargan, fpcm, features);
+            if (pop_detect) {
+                for (i=0;i<LPCNET_FRAME_SIZE;i++) if (fabsf(32768.f*fpcm[i]) > 64000.f) { fprintf(stderr, "POP\n"); break; }
+            }
             for (i=0;i<LPCNET_FRAME_SIZE;i++) pcm[i] = (int)floor(.5 + MIN32(32767, MAX32(-32767, 32768.f*fpcm[i])));
             fwrite(pcm, sizeof(pcm[0]), LPCNET_FRAME_SIZE, fout);
         }

@@ -1,0 +1,169 @@
+#!/bin/bash -x
+#
+# RADE V2 spot test for "4 point tests" - use extra arguments to set channel type
+
+OPUS=build/src
+PATH=${PATH}:${OPUS}
+
+features_out=features_out_rx2.f32
+# larger more realistic for low SNR test
+delta=${delta:-0.01}
+
+function print_help {
+    echo
+    echo "RADE V2 spot test helper script"
+    echo
+    echo "  usage ./test/v2_spot.sh [--g_file file_name] [--EbNodB value] [--prepend_noise Nsecs] [rx2.sh options]"
+    echo "  for example:"
+    echo "       ./test/v2_spot.sh "
+    echo "       ./test/v2_spot.sh --g_file g_mpp.f32 --EbNodB 6 "
+    echo "       ./test/v2_spot.sh "
+    echo "       ./test/v2_spot.sh --EbNodB 1 --gain 0.1 --agc"
+    echo
+    exit
+}
+
+# strip of args for inference.sh
+g_file=""
+a_g_file=""
+g_offset=""
+a_g_offset="" 
+EbNodB=""
+a_EbNodB_value=""
+a_prepend_noise=1
+sine_amp=""
+a_sine_amp=""
+sine_freq=""
+a_sine_freq=""
+prepend_signal2=0
+sample_clock_offset=0
+df_dt=""
+a_df_dt=""
+ssbfilt=""
+wav="wav/all.wav"
+wav_out="/dev/null"
+eoo=""
+POSITIONAL=()
+while [[ $# -gt 0 ]]
+do
+key="$1"
+case $key in
+    --g_file)
+        g_file="--g_file"
+        a_g_file="$2"	
+        shift
+        shift
+    ;;
+    --EbNodB)
+        EbNodB="--EbNodB"
+        a_EbNodB_value="$2"	
+        shift
+        shift
+    ;;
+    --prepend_noise)
+        a_prepend_noise="$2"	
+        shift
+        shift
+    ;;
+    --sine_amp)
+        sine_amp="--sine_amp"
+        a_sine_amp="$2"	
+        shift
+        shift
+    ;;
+    --sine_freq)
+        sine_freq="--sine_freq"
+        a_sine_freq="$2"	
+        shift
+        shift
+    ;;
+    -h)
+        print_help	
+    ;;
+    --prepend_signal2)
+        prepend_signal2=1	
+        shift
+    ;;
+    --sample_clock_offset)
+        sample_clock_offset=1	
+        a_rx_Fs="$2"
+        shift
+        shift
+    ;;
+    --df_dt)
+        df_dt="--df_dt"
+        a_df_dt="$2"
+        shift
+        shift
+    ;;
+    --ssb_filt)
+        ssb_bpf="--ssb_bpf"
+        shift
+    ;;
+    --end_of_over_v2)
+        eoo="--end_of_over_v2"
+        shift
+    ;;
+    --g_offset)
+        g_offset="--g_offset"
+        a_g_offset=$2
+        shift
+        shift
+    ;;
+    --wav)
+        wav=$2
+        shift
+        shift
+    ;;
+    --wav_out)
+        wav_out=$2
+        shift
+        shift
+    ;;
+   *)
+    POSITIONAL+=("$1") # save it in an array for later
+    shift
+    ;;
+esac
+done
+set -- "${POSITIONAL[@]}" # restore positional parameters
+
+# optional pre-pending of a 2nd RADE V2 signal to test state machine with two sucessive signals
+if [ "$prepend_signal2" -eq 1 ]; then
+    ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/brian_g8sez.wav /dev/null --rate_Fs --latent-dim 56 \
+    --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 --write_rx brian_rx.f32 \
+    --prepend_noise 1.0 --freq_offset -25 --correct_freq_offset \
+    $g_file $a_g_file $EbNodB $a_EbNodB_value $sine_amp $a_sine_amp $sine_freq $a_sine_freq $ssb_filt
+fi
+
+./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth ${wav} /dev/null --rate_Fs --latent-dim 56 \
+--peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 --write_rx 250725_rx.f32 \
+--prepend_noise $a_prepend_noise --append_noise 2 --freq_offset 25 --correct_freq_offset $eoo $df_dt $a_df_dt \
+$g_file $a_g_file $EbNodB $a_EbNodB_value $sine_amp $a_sine_amp $sine_freq $a_sine_freq $ssb_bpf $g_offset $a_g_offset
+
+# we do the pre-pending here so features_out.f32 is from all.wav
+if [ "$prepend_signal2" -eq 1 ]; then
+    tmp=$(mktemp)
+    cat brian_rx.f32 250725_rx.f32 > $tmp
+    cp $tmp 250725_rx.f32
+fi
+
+# optional sample clock offset, rx clock faster than tx clock
+if [ "$sample_clock_offset" -eq 1 ]; then
+    tmp=$(mktemp)
+    cat 250725_rx.f32 | python3 f32toint16.py --scale 8192 | sox -t .s16 -r 8000 -c 2 - -t .s16 -r $a_rx_Fs -c 2 - | python3 int16tof32.py --scale 1.22E-4 > $tmp
+    cp $tmp 250725_rx.f32
+fi
+
+# debug tips:
+# octave> figure(1); clf; sig_det=load_raw('sig_det.int16'); plot(sig_det); state=load_raw('state.int16'); \
+# hold on; plot(state*1.5); hold off; \
+# figure(2); freq_offset=load_f32('freq_offset.f32',1); plot(freq_offset);
+# 2) remove --quiet and look for state transitions (e.g. back to noise), which upsets alignment for loss.py
+./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync 250725_rx.f32 ${wav_out} --quiet \
+--write_sig_det sig_det.int16 --write_state state.int16 --write_freq_offset freq_offset.f32 \
+--write_frame_sync frame_sync.f32 --write_delta_hat delta_hat.f32 --write_delta_hat_g delta_hat_g.f32 $@
+
+# debug tip: run from cmd line with --plot
+python3 loss.py features_in.f32 features_out.f32 --features_hat2 features_out_rx2.f32 \
+--clip_start 100 --clip_end 300 --compare --delta $delta

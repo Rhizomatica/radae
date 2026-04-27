@@ -36,13 +36,14 @@ import numpy as np
 parser = argparse.ArgumentParser()
 
 parser.add_argument('--zeropad',  action='store_true', help='zero pad so output IQIQI with Q=0')
+parser.add_argument('--scale', type=float, default=1.0, help='input scaling factor (default 1.0)')
 args = parser.parse_args()
 
 while True:
     buffer = sys.stdin.buffer.read(struct.calcsize("hh"))
     if len(buffer) != struct.calcsize("hh"):
       break
-    x = np.frombuffer(buffer,np.int16).astype(np.float32)
+    x = args.scale*np.frombuffer(buffer,np.int16).astype(np.float32)
     if args.zeropad:
         y = np.zeros(2*len(x), dtype=np.float32)
         y[::2] = x

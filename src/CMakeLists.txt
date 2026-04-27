@@ -1,5 +1,11 @@
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
+add_executable(ch ch.c ch_fdmdv.c)
+target_link_libraries(ch m)
+
+add_executable(mksine mksine.c)
+target_link_libraries(mksine m)
+
 add_executable(lpcnet_demo lpcnet_demo.c)
 target_link_libraries(lpcnet_demo opus m)
 

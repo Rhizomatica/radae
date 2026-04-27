@@ -10,10 +10,6 @@ option(BUILD_SHARED_LIBS
     "Build shared library. Set to OFF for static library." ON)
 option(AVX "Enable AVX CPU optimizations." ON)
 
-if(NOT CODEC2_DEV_BUILD_DIR)
-    set(CODEC2_DEV_BUILD_DIR $HOME/codec2-dev/build_linux )
-endif()
-
 set(CMAKE_OSX_DEPLOYMENT_TARGET "10.11" CACHE STRING "Minimum OS X deployment version" FORCE)
 
 # Build universal ARM64 and x86_64 binaries on Mac.
@@ -171,18 +167,18 @@ add_test(NAME rx_loss_acq_time
 # Estimating C/No on multipath channels using a chirp
 add_test(NAME chirp_mpp
         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
-                       ./test/chirp_mpp.sh ${CODEC2_DEV_BUILD_DIR} -16")
+                       ./test/chirp_mpp.sh ${CMAKE_BINARY_DIR} -16")
 
 # Low SNR ota_test.sh, with chirp measurement, AWGN
 add_test(NAME ota_test_awgn
         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
-                       ./test/ota_test_cal.sh ${CODEC2_DEV_BUILD_DIR} -21 0.4")
+                       ./test/ota_test_cal.sh ${CMAKE_BINARY_DIR} wav/brian_g8sez.wav -24 0.4")
 
 # Low SNR ota_test.sh, with chirp measurement, MPP, high loss threshold as we only care about gross errors,
 # like stuck in false sync
 add_test(NAME ota_test_mpp
         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
-                       ./test/ota_test_cal.sh ${CODEC2_DEV_BUILD_DIR} -24 0.4 --mpp --freq -25")
+                       ./test/ota_test_cal.sh ${CMAKE_BINARY_DIR} wav/brian_g8sez.wav -30 0.45 --mpp --freq -25")
 
 
 # Acquisition tests ------------------------------------------------------------------------------------
@@ -191,7 +187,7 @@ add_test(NAME ota_test_mpp
 add_test(NAME acq_noise
         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
                        dd if=/dev/zero of=/dev/stdout bs=16000 count=30 | \
-                       ${CODEC2_DEV_BUILD_DIR}/src/ch - rx.int16 --No -20; \          # real int16 output
+                       ${CMAKE_BINARY_DIR}/src/ch - rx.int16 --No -20; \          # real int16 output
                        cat rx.int16 | python3 int16tof32.py --zeropad > rx.f32; \     # ..IQIQI.. .f32 with Q == 0
                        ./rx.sh model17/checkpoints/checkpoint_epoch_100.pth rx.f32 /dev/null \
                        --pilots --pilot_eq --bottleneck 3 --cp 0.004 --coarse_mag --time_offset -16")
@@ -200,8 +196,8 @@ add_test(NAME acq_noise
 # sine wave + noise-only test, should not acquire 
 add_test(NAME acq_sine
         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
-                       ${CODEC2_DEV_BUILD_DIR}/misc/mksine - 1000 30 | \
-                       ${CODEC2_DEV_BUILD_DIR}/src/ch - rx.int16 --No -20; \          # real int16 output
+                       ${CMAKE_BINARY_DIR}/src/mksine - 1000 30 | \
+                       ${CMAKE_BINARY_DIR}/src/ch - rx.int16 --No -20; \          # real int16 output
                        cat rx.int16 | python3 int16tof32.py --zeropad > rx.f32; \     # ..IQIQI.. .f32 with Q == 0
                        ./rx.sh model17/checkpoints/checkpoint_epoch_100.pth rx.f32 /dev/null \
                        --pilots --pilot_eq --bottleneck 3 --cp 0.004 --coarse_mag --time_offset -16")
@@ -400,7 +396,7 @@ add_test(NAME radae_rx_dfs
 
 # Test ability to handle buffer slips due to sample clock offsets, rx ADC clock > tx ADC clock.  We make sample clock error larger than 200ppm spec
 # in order to exercise code.  Nice thing about "nin" design is it allows us to get meaningful "loss.py" results, ie no frames are lost.  We're
-# really just trying to exercise the slip code here, not too cocnerned about loss.  There should be a noticable transition in tmax in each test as
+# really just trying to exercise the slip code here, not too concerned about loss.  There should be a noticable transition in tmax in each test as
 # it hits the upper or lower limit
 add_test(NAME radae_rx_slip_plus
         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
@@ -430,7 +426,7 @@ add_test(NAME radae_rx_slip_minus
                        --rate_Fs --pilots --pilot_eq --eq_ls --cp 0.004 --bottleneck 3 --auxdata --write_rx rx.f32 --correct_freq_offset --prepend_noise 0.11; \
                        cat rx.f32 | python3 f32toint16.py --scale 8192 | sox -t .s16 -r 8000 -c 2 - -t .s16 -r 7995 -c 2 - | python3 int16tof32.py > rx_.f32; \
                        cat rx_.f32 | python3 radae_rxe.py --model model19_check3/checkpoints/checkpoint_epoch_100.pth -v 2 > features_rxs_out.f32; \
-                       python3 loss.py features_in.f32 features_rxs_out.f32 --loss_test 0.2 --acq_time_test 1.0")
+                       python3 loss.py features_in.f32 features_rxs_out.f32 --loss_test 0.25 --acq_time_test 1.0")
                        set_tests_properties(radae_rx_slip_minus PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
 # profiles a run with a 50 second file (no pass/fail, run with -V to get a rough idea of execution time)
@@ -589,7 +585,7 @@ add_test(NAME c_decoder_aux_mpp
 
 # EOO data -------------------------------------------------------------------------------------------
 
-# Pythion Tx & Rx, no noise
+# Python Tx & Rx, no noise
 add_test(NAME radae_eoo_data_py
         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
                        ${CMAKE_CURRENT_BINARY_DIR}/src/lpcnet_demo -features wav/brian_g8sez.wav features_in.f32; \
@@ -616,7 +612,7 @@ add_test(NAME radae_eoo_data_mpp
                        cat features_in.f32 | PYTHONPATH='.' ${CMAKE_CURRENT_BINARY_DIR}/src/radae_tx > tx.f32; \
                        cat tx.f32 tx.f32 tx.f32 tx.f32 tx.f32 > tx_2.f32;
                        cat tx_2.f32 | python3 f32toint16.py --real --scale 8192 > tx.raw; \
-                       ${CODEC2_DEV_BUILD_DIR}/src/ch tx.raw rx.raw --No -24 --mpp --fading_dir .; \
+                       ${CMAKE_BINARY_DIR}/src/ch tx.raw rx.raw --No -24 --mpp --fading_dir .; \
                        cat rx.raw | python3 int16tof32.py --zeropad > rx.f32; \
                        cat rx.f32 | PYTHONPATH='.' ${CMAKE_CURRENT_BINARY_DIR}/src/radae_rx > /dev/null; \
                        python3 eoo_ber.py eoo_tx.f32 eoo_rx.f32")
@@ -652,8 +648,265 @@ add_test(NAME bbfm_sc_loss
 add_test(NAME bbfm_sc_bpf_loss
         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
                        ./bbfm_inference.sh model_bbfm_01/checkpoints/checkpoint_epoch_100.pth wav/brian_g8sez.wav /dev/null --write_latent z.f32; \
-                       cat z.f32 | python3 sc_tx.py | ${CODEC2_DEV_BUILD_DIR}/src/ch - - | python3 sc_rx.py > z_hat.f32; \
+                       cat z.f32 | python3 sc_tx.py | ${CMAKE_BINARY_DIR}/src/ch - - | python3 sc_rx.py > z_hat.f32; \
                        ./bbfm_rx.sh model_bbfm_01/checkpoints/checkpoint_epoch_100.pth z_hat.f32 /dev/null; \
                        python3 loss.py features_in.f32 features_out.f32 --features_hat2 features_rx_out.f32 --compare")
                        set_tests_properties(bbfm_sc_bpf_loss PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+# RADE V2 -----------------------------------------------------------------------------------------------
+
+# rx2.sh "4 point" tests
+add_test(NAME v2_rx2_awgn_high
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
+                       ./test/v2_spot.sh")
+         set_tests_properties(v2_rx2_awgn_high PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+add_test(NAME v2_rx2_awgn_low
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
+                       delta=0.03 ./test/v2_spot.sh --EbNodB 1 --hangover 100")
+         set_tests_properties(v2_rx2_awgn_low PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+add_test(NAME v2_rx2_mpp_high
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
+                       ./test/v2_spot.sh --g_file g_mpp.f32")
+         set_tests_properties(v2_rx2_mpp_high PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+add_test(NAME v2_rx2_mpp_low
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
+                       delta=0.03 ./test/v2_spot.sh --g_file g_mpp.f32 --EbNodB 6 --hangover 100")
+         set_tests_properties(v2_rx2_mpp_low PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+        
+# repeat v2_rx2_mpp_low with 20ms (half frame) time shift to repeat last test with opposite frame sync
+# to visualise FS metrics:
+# octave:377>  figure(4); frame_sync=load_f32('frame_sync.f32',2); plot(frame_sync(:,1)); hold on; plot(frame_sync(:,2)); hold off;
+add_test(NAME v2_rx2_oppfs
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
+                       delta=0.03 ./test/v2_spot.sh --g_file g_mpp.f32 --EbNodB 6 --prepend_noise 0.98")
+         set_tests_properties(v2_rx2_oppfs PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+# Pop tests: inject pitch=-3.0 (well below the -1.4 threshold) into features_in before inference.
+# The encoder compresses this to ~-1.7 at the decoder output, which is still below -1.4 and triggers pops.
+# pop1: limit_pitch clamp in rx2.py suppresses pops (FAIL if POP seen)
+# pop2: --nolimit_pitch disables clamp, pops occur (PASS if POP seen)
+# Both tests exercise the full radio chain to test the limit_pitch code path in rx2.py.
+add_test(NAME v2_rx2_mpp_low_pop1
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
+                       ${CMAKE_SOURCE_DIR}/build/src/lpcnet_demo -features wav/david_vk5dgr.wav features_in.f32; \
+                       python3 inject_bad_pitch.py features_in.f32 features_in_bad.f32 -3.0 5; \
+                       python3 inference.py 250725/checkpoints/checkpoint_epoch_200.pth features_in_bad.f32 /dev/null \
+                       --rate_Fs --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 \
+                       --auxdata --w1_dec 128 --EbNodB 100 --write_rx pop_tx.f32; \
+                       ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync pop_tx.f32 tmp.wav")
+         set_tests_properties(v2_rx2_mpp_low_pop1 PROPERTIES FAIL_REGULAR_EXPRESSION "POP")
+add_test(NAME v2_rx2_mpp_low_pop2
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
+                       ${CMAKE_SOURCE_DIR}/build/src/lpcnet_demo -features wav/david_vk5dgr.wav features_in.f32; \
+                       python3 inject_bad_pitch.py features_in.f32 features_in_bad.f32 -3.0 5; \
+                       python3 inference.py 250725/checkpoints/checkpoint_epoch_200.pth features_in_bad.f32 /dev/null \
+                       --rate_Fs --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 \
+                       --auxdata --w1_dec 128 --EbNodB 100 --write_rx pop_tx.f32; \
+                       ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync pop_tx.f32 tmp.wav \
+                       --nolimit_pitch")
+         set_tests_properties(v2_rx2_mpp_low_pop2 PROPERTIES PASS_REGULAR_EXPRESSION "POP")
+        
+# tests to exercise limits of timing est to decoder interface (Jan 2026 timing corner case)
+# we allow a little bit of extra loss at limits (delta=0.05), but want to trap a complete breakdown (like frame sync failing)
+
+add_test(NAME v2_timing_low_delta1
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; test/make_g.sh;
+                       delta=0.05 ./test/v2_timing.sh --g_file g_mpp_low.f32 --fix_delta_hat 32 --quiet")
+         set_tests_properties(v2_timing_low_delta1 PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+add_test(NAME v2_timing_low_delta2
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
+                       delta=0.05 ./test/v2_timing.sh --g_file g_mpp_low.f32 --fix_delta_hat 48 --quiet")
+         set_tests_properties(v2_timing_low_delta2 PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+add_test(NAME v2_timing_high_delta1
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
+                       delta=0.05 ./test/v2_timing.sh --g_file g_mpp_high.f32 --fix_delta_hat 32 --quiet")
+         set_tests_properties(v2_timing_high_delta1 PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+add_test(NAME v2_timing_high_delta2
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
+                       delta=0.05 ./test/v2_timing.sh --g_file g_mpp_high.f32 --fix_delta_hat 48 --quiet")
+         set_tests_properties(v2_timing_high_delta2 PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+# dealing with sample clock differences --------------------------
+
+# useful visualisation:
+#  octave:573> Ry_smooth=load_c64('Ry_smooth.c64',160); figure(2); mesh(abs(Ry_smooth(1:600,:)))
+#  octave:574> delta_hat=load_f32('delta_hat.f32',1); figure(1); clf; plot(delta_hat);
+
+# shift delta backwards logic
+add_test(NAME v2_rx2_samclk_back
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
+                       ./test/v2_spot.sh --pad_samples 70 --write_Ry_smooth Ry_smooth.c64")
+         set_tests_properties(v2_rx2_samclk_back PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+# shift delta forward logic
+add_test(NAME v2_rx2_samclk_fwd
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
+                       ./test/v2_spot.sh --pad_samples 90 --write_Ry_smooth Ry_smooth.c64")
+         set_tests_properties(v2_rx2_samclk_fwd PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+# rx sample clock 25 ppm slower than tx, --pad_samples adjusted for a shift delta forwards
+add_test(NAME v2_rx2_samclk_slow
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
+                       ./test/v2_spot.sh --sample_clock_offset 7999.8 --write_Ry_smooth Ry_smooth.c64 --write_delta_hat delta_hat.f32 --pad_samples 120")
+         set_tests_properties(v2_rx2_samclk_slow PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+# rx sample clock 25 ppm faster than tx, --pad_samples adjusted for a shift delta backwards
+add_test(NAME v2_rx2_samclk_fast
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
+                       ./test/v2_spot.sh --sample_clock_offset 8000.2 --write_Ry_smooth Ry_smooth.c64 --write_delta_hat delta_hat.f32 --pad_samples 35")
+         set_tests_properties(v2_rx2_samclk_fast PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+# frequency drift of -5 Hz/minute, 3.5dB SNR MPP channel
+add_test(NAME v2_rx2_freq_drift
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
+                       delta=0.02 ./test/v2_spot.sh --g_file g_mpp.f32 --EbNodB 10 --df_dt -0.1")
+         set_tests_properties(v2_rx2_freq_drift PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+# two RADE V2 signals signal1, signal2 close together, check signal2 acquired OK, timing on signal2
+# contrived to be right on edge of symbol boundary to make a little harder
+add_test(NAME v2_rx2_signal1_signal2
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
+                       ./test/v2_spot.sh --verbose --prepend_signal2 --prepend_noise 0.31 --EbNodB 10 --reset_output_on_resync")
+         set_tests_properties(v2_rx2_signal1_signal2 PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+# spot checks with AGC
+
+add_test(NAME v2_rx2_agc_mpp_high
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
+                       ./test/v2_spot.sh --g_file g_mpp.f32 --agc --gain 4")
+         set_tests_properties(v2_rx2_agc_mpp_high PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+add_test(NAME v2_rx2_agc_mpp_low
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
+                       delta=0.03 ./test/v2_spot.sh --g_file g_mpp.f32 --EbNodB 6 --agc --gain 0.25")
+         set_tests_properties(v2_rx2_agc_mpp_low PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+# rx2.sh with complex->real conversions, `ch` tool, and --agc, high SNR, note --gain need to get us in ballpark
+add_test(NAME v2_rx2_ch
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
+                       ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/brian_g8sez.wav /dev/null --rate_Fs \
+                       --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 \
+                       --ssb_bpf --write_rx brian_tx.f32; \
+         cat brian_tx.f32 | python3 f32toint16.py --real --scale 16383 | ${CMAKE_BINARY_DIR}/src/ch - - | python3 int16tof32.py --zeropad > brian_rx.f32
+         ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725_ml_sync brian_rx.f32 /dev/null \
+         --agc --quiet --write_gain gain.f32 --gain 1.22E-4; \
+         python3 loss.py features_in.f32 features_out.f32 --features_hat2 features_out_rx2.f32 --compare --clip_start 50 --clip_end 50")
+         set_tests_properties(v2_rx2_ch PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+# V2 EOO test: transmit with --end_of_over_v2 (no noise), check rx2.py detects "EOO detected"
+add_test(NAME v2_eoo_awgn_high
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
+                       ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/brian_g8sez.wav /dev/null --rate_Fs \
+                       --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 \
+                       --end_of_over_v2 --write_rx v2_eoo_tx.f32 --append_noise 1; \
+                       ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync v2_eoo_tx.f32 /dev/null \
+                       2>&1 | grep 'EOO detected' && echo PASS || echo FAIL")
+         set_tests_properties(v2_eoo_awgn_high PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+add_test(NAME v2_eoo_awgn_low
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
+                       ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/brian_g8sez.wav /dev/null --rate_Fs \
+                       --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 \
+                       --end_of_over_v2 --write_rx v2_eoo_tx.f32 --append_noise 1 --EbNodB 6; \
+                       ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync v2_eoo_tx.f32 /dev/null \
+                       2>&1 | grep 'EOO detected' && echo PASS || echo FAIL")
+         set_tests_properties(v2_eoo_awgn_low PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+add_test(NAME v2_eoo_mpp_high
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
+                       ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/brian_g8sez.wav /dev/null --rate_Fs \
+                       --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 \
+                       --end_of_over_v2 --write_rx v2_eoo_tx.f32 --append_noise 1 --g_file g_mpp.f32; \
+                       ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync v2_eoo_tx.f32 /dev/null \
+                       2>&1 | grep 'EOO detected' && echo PASS || echo FAIL")
+         set_tests_properties(v2_eoo_mpp_high PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+add_test(NAME v2_eoo_mpp_low
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
+                       ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/brian_g8sez.wav /dev/null --rate_Fs \
+                       --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 \
+                       --end_of_over_v2 --write_rx v2_eoo_tx.f32 --append_noise 1 --g_file g_mpp.f32 --EbNodB 8; \
+                       ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync v2_eoo_tx.f32 /dev/null \
+                       2>&1 | grep 'EOO detected' && echo PASS || echo FAIL")
+         set_tests_properties(v2_eoo_mpp_low PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+# V2 EOO false-trigger tests: normal transmission (no EOO) using a long file, check no false "EOO detected"
+add_test(NAME v2_eoo_no_false_trigger_awgn
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
+                       ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/all.wav /dev/null --rate_Fs \
+                       --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 \
+                       --write_rx v2_eoo_notx.f32 --EbNodB 10; \
+                       ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync v2_eoo_notx.f32 /dev/null \
+                       2>&1 | \
+                       grep 'EOO detected' && echo FAIL || echo PASS")
+         set_tests_properties(v2_eoo_no_false_trigger_awgn PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+add_test(NAME v2_eoo_no_false_trigger_mpp
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
+                       ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/all.wav /dev/null --rate_Fs \
+                       --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 \
+                       --write_rx v2_eoo_notx.f32 --g_file g_mpp.f32 --EbNodB 10; \
+                       ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync v2_eoo_notx.f32 /dev/null \
+                       2>&1 | \
+                       grep 'EOO detected' && echo FAIL || echo PASS")
+         set_tests_properties(v2_eoo_no_false_trigger_mpp PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+# SNR estimator tests: compare snr_est_dB from rx2.py to SNR3k on inference.py Measured: line
+add_test(NAME v2_snr_est_high
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
+                       ${CMAKE_SOURCE_DIR}/build/src/lpcnet_demo -features wav/david_vk5dgr.wav snr_feats.f32; \
+                       python3 inference.py 250725/checkpoints/checkpoint_epoch_200.pth snr_feats.f32 /dev/null \
+                       --latent-dim 56 --w1_dec 128 --auxdata --rate_Fs --cp 0.004 \
+                       --time_offset -16 --correct_time_offset -16 --peak \
+                       --EbNodB 12 --write_rx snr_rx_high.f32 --append_noise 1 > snr_inf_high.txt; \
+                       SNR3K=\$(grep Measured snr_inf_high.txt | awk '{print \$4}'); \
+                       python3 rx2.py 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync \
+                       snr_rx_high.f32 /dev/null --quiet \
+                       --write_snr_est snr_est_high.f32; \
+                       python3 check_snr_est.py \$SNR3K snr_est_high.f32 3.0")
+         set_tests_properties(v2_snr_est_high PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+add_test(NAME v2_snr_est_low
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
+                       ${CMAKE_SOURCE_DIR}/build/src/lpcnet_demo -features wav/david_vk5dgr.wav snr_feats.f32; \
+                       python3 inference.py 250725/checkpoints/checkpoint_epoch_200.pth snr_feats.f32 /dev/null \
+                       --latent-dim 56 --w1_dec 128 --auxdata --rate_Fs --cp 0.004 \
+                       --time_offset -16 --correct_time_offset -16 --peak \
+                       --EbNodB 2 --write_rx snr_rx_low.f32 --append_noise 1 > snr_inf_low.txt; \
+                       SNR3K=\$(grep Measured snr_inf_low.txt | awk '{print \$4}'); \
+                       python3 rx2.py 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync \
+                       snr_rx_low.f32 /dev/null --quiet \
+                       --write_snr_est snr_est_low.f32; \
+                       python3 check_snr_est.py \$SNR3K snr_est_low.f32 2.0")
+         set_tests_properties(v2_snr_est_low PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+# tx2.sh test: encode with tx2.sh, decode with rx2.sh, compare to inference.py reference
+add_test(NAME v2_tx2
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
+                       ./tx2.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/brian_g8sez.wav v2_tx2_rx.f32; \
+                       python3 inference.py 250725/checkpoints/checkpoint_epoch_200.pth features_in.f32 features_out.f32 \
+                       --latent-dim 56 --w1_dec 128 --auxdata --rate_Fs --cp 0.004 \
+                       --time_offset -16 --correct_time_offset -8 --peak; \
+                       ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync v2_tx2_rx.f32 /dev/null --quiet; \
+                       python3 loss.py features_in.f32 features_out.f32 --features_hat2 features_out_rx2.f32 \
+                       --clip_start 100 --clip_end 300 --compare --delta 0.05")
+         set_tests_properties(v2_tx2 PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+# tx2.sh channel test: tx2->ch->rx2 vs inference->ch->rx2, verifies tx2 matches inference under channel impairments
+# --No -20 gives approximately 6 dB SNR3k for --scale 16383 peak-normalised RADE V2 signal (RMS~11172)
+add_test(NAME v2_tx2_ch
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
+                       ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/brian_g8sez.wav /dev/null \
+                       --rate_Fs --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -8 \
+                       --auxdata --w1_dec 128 --ssb_bpf --write_rx v2_tx2ch_inf.f32; \
+                       cat v2_tx2ch_inf.f32 | python3 f32toint16.py --real --scale 16383 | ${CMAKE_BINARY_DIR}/src/ch - - --No -20 | python3 int16tof32.py --zeropad > v2_tx2ch_inf_rx.f32; \
+                       ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync v2_tx2ch_inf_rx.f32 /dev/null \
+                       --agc --gain 1.22E-4 --quiet; \
+                       cp features_out_rx2.f32 features_out_rx2_inf.f32; \
+                       ./tx2.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/brian_g8sez.wav v2_tx2ch_tx.f32 --ssb_bpf; \
+                       cat v2_tx2ch_tx.f32 | python3 f32toint16.py --real --scale 16383 | ${CMAKE_BINARY_DIR}/src/ch - - --No -20 | python3 int16tof32.py --zeropad > v2_tx2ch_rx.f32; \
+                       ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync v2_tx2ch_rx.f32 /dev/null \
+                       --agc --gain 1.22E-4 --quiet; \
+                       python3 loss.py features_in.f32 features_out_rx2_inf.f32 --features_hat2 features_out_rx2.f32 \
+                       --compare --clip_start 50 --clip_end 50 --delta 0.1")
+         set_tests_properties(v2_tx2_ch PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 

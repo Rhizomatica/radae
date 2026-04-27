@@ -26,15 +26,13 @@ function measure_rms() {
 }
 
 function measure_peak() {
-    ch_log=$(mktemp)
-    ch $1 /dev/null --clip 16384 --ssbfilt 0 2>${ch_log}
-    peak=$(cat $ch_log | grep "peak" | tr -s ' ' | cut -d' ' -f3)
+    peak=$(echo "s=load_raw('$1'); printf('%d',max(abs(s))); quit" | octave -qf 2>/dev/null)
     echo $peak
 }
 
 function measure_cpapr() {
     ch_log=$(mktemp)
-    ch $1 /dev/null --clip 16384 --ssbfilt 0 2>${ch_log}
+    ch $1 /dev/null --ssbfilt 0 2>${ch_log}
     cpapr=$(cat $ch_log | grep "CPAPR" | tr -s ' ' | cut -d' ' -f7)
     echo $cpapr
 }
