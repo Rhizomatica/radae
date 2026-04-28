@@ -409,11 +409,12 @@ class receiver_one():
          local_path_delay_s = 0.0025      # guess at actual path delay, means a little bit of noise on scatter
          a = local_path_delay_s*self.Fs
          A = torch.tensor([[1, torch.exp(-1j*self.w[c_mid-1]*a)], [1, torch.exp(-1j*self.w[c_mid]*a)], [1, torch.exp(-1j*self.w[c_mid+1]*a)]])
-         self.Pmat[c] = torch.matmul(torch.inverse(torch.matmul(torch.transpose(A,0,1),A)),torch.transpose(A,0,1))
+         AH = torch.conj(torch.transpose(A,0,1))
+         self.Pmat[c] = torch.matmul(torch.inverse(torch.matmul(AH,A)),AH)
 
       self.snrdB_3k_est = 0
-      self.m = 0.8070
-      self.c = 2.513
+      self.m = 0.7650
+      self.c = 4.1343
          
    def est_pilots(self, rx_sym_pilots, num_modem_frames, Nc, Ns):
       rx_pilots = torch.zeros(num_modem_frames+1, Nc, dtype=torch.complex64)
@@ -440,7 +441,7 @@ class receiver_one():
       rx_phase = torch.angle(rx_pilots[0,:])
       Rcn_hat = Pcn_hat * torch.exp(-1j*rx_phase)
       S1 = torch.sum(torch.abs(Pcn_hat)**2)
-      S2 = torch.sum(torch.abs(Rcn_hat.imag)**2) + 1E-12 
+      S2 = torch.sum(torch.abs(Rcn_hat.imag)**2) + 1E-12
       snr_est = S1/(2*S2) - 1
       # remove occasional illegal values
       if snr_est <= 0:

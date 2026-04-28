@@ -412,7 +412,8 @@ class RADAE(nn.Module):
                         local_path_delay_s = 0.0025      # guess at actual path delay
                         a = local_path_delay_s*self.Fs
                         A = torch.tensor([[1, torch.exp(-1j*self.w[c_mid-1]*a)], [1, torch.exp(-1j*self.w[c_mid]*a)], [1, torch.exp(-1j*self.w[c_mid+1]*a)]])
-                        P = torch.matmul(torch.inverse(torch.matmul(torch.transpose(A,0,1),A)),torch.transpose(A,0,1))
+                        AH = torch.conj(torch.transpose(A,0,1))
+                        P = torch.matmul(torch.inverse(torch.matmul(AH,A)),AH)
                         h = torch.reshape(rx_sym_pilots[0,i,0,c_mid-1:c_mid+2]/self.P[c_mid-1:c_mid+2],(3,1))
                         g = torch.matmul(P,h)
                         rx_pilots[i,c] = g[0] + g[1]*torch.exp(-1j*self.w[c]*a)

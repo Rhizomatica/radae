@@ -131,7 +131,7 @@ model = RADAE(num_features, latent_dim, EbNodB=100, rate_Fs=True, pilots=True, c
 
 # Bring up a receiver instance to use least squares phase est
 receiver = receiver_one(model.latent_dim,model.Fs,model.M,model.Ncp,model.Wfwd,model.Nc,
-                        model.Ns,model.w,model.P,model.bottleneck,model.pilot_gain,
+                        model.Ns,model.w,model.P,model.Pend,model.bottleneck,model.pilot_gain,
                         model.time_offset,model.coarse_mag)
 print("")
 
