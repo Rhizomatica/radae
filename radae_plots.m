@@ -1,32 +1,35 @@
 # radae_plots.m
-# Octave helper script to generate some plots form inference.py outputs
+# Octave helper scripts for RADE
 
 1;
 pkg load statistics signal;
 
-function do_plots(z_fn='l.f32',rx_fn='', png_fn='', epslatex='')
-    if length(epslatex)
+function do_plots(z_fn='l.f32',rx_fn='', png_fn='', epslatex='',tx_bpf=0)
+    if length(epslatex) || length(png_fn)
         [textfontsize linewidth] = set_fonts(20);
     end
     if length(z_fn)
       z=load_f32(z_fn,1);
       s=z(1:2:end)+j*z(2:2:end);
-      figure(2); clf; plot(s,'.'); title('Scatter');
+      figure(2); clf; plot(s,'.');
       mx = max(abs(z))*1.2; axis([-mx mx -mx mx])
       if length(png_fn)
-        print("-dpng",sprintf("%s_scatter.png",png_fn));
+        print("-dpng",sprintf("%s_scatter.png",png_fn),"-S1200,1200");
       end
       if length(epslatex)
         print_eps(sprintf("%s_scatter.eps",epslatex),"-S250,250");
       end
       figure(3); clf;
       [nn cc] = hist3([real(s) imag(s)],[25 25]);
-      mesh(cc{1},cc{2},nn); title('Scatter 3D');   
+      size(nn)
+      max(nn(:))
+      mesh(cc{1},cc{2},nn/max(nn(:)));
+      xlabel('Real'); ylabel('Imag'); zlabel('Count');
       if length(png_fn)
-        print("-dpng",sprintf("%s_scatter_3d.png",png_fn));
+        print("-dpng",sprintf("%s_hist_2d.png",png_fn));
       end
       if length(epslatex)
-        print_eps(sprintf("%s_scatter_3d.eps",epslatex),"-S300,300");
+        print_eps(sprintf("%s_hist_2d.eps",epslatex),"-S250,250");
       end
       figure(4); clf; hist(abs(s));
     end
@@ -35,40 +38,60 @@ function do_plots(z_fn='l.f32',rx_fn='', png_fn='', epslatex='')
         rx=load_f32(rx_fn,1); 
         rx=rx(1:2:end)+j*rx(2:2:end); 
         
-        tx_bpf = 0;
         if tx_bpf
           lpf=fir1(100,900/4000);
           w = 2*pi*1500/8000;
           N=length(rx);
           lo = exp(j*(0:N-1)*w)';
           rx = filter(lpf,1,rx.*lo).*conj(lo);
-          ind = find(abs(rx) > 1);
-          rx(ind) = exp(j*angle(rx(ind)));
         end
+        rms = sqrt(mean(abs(rx).^2));
         figure(5); clf; plot(rx); title('rate Fs Scatter (IQ)'); mx = max(abs(rx))*1.5; axis([-mx mx -mx mx]);
-        figure(6); clf; plot(real(rx)); xlabel('Time (samples)'); ylabel('rx');
+        hold on; theta=0:0.1:2*pi; plot(rms*cos(theta),rms*sin(theta),'g-'); hold off;
+        figure(6); clf; plot(real(rx));  xlabel('Time (samples)'); ylabel('rx');
+        hold on; plot([0 length(rx)],[rms rms],'g-'); plot([0 length(rx)],[-rms -rms],'g-'); hold off;
         figure(7); clf; plot_specgram(rx, Fs=8000, 0, 3000);
         
         % Spectrum plot
         Fs = 8000; y = pwelch(rx,[],[],1024,Fs); y_dB = 10*log10(y);
+        mx = max(y_dB); mx = ceil(mx/10)*10;
+        figure(10); clf; 
+        plot((0:length(y)-1)*Fs/length(y),y_dB-mx);
+        axis([0 3000 -40 0]); grid; xlabel('Freq (Hz)'); ylabel('dB');
+        if length(png_fn)
+          print("-dpng",sprintf("%s_spectrum.png",png_fn),"-S1200,1200");
+        end
+        if length(epslatex)
+          print_eps(sprintf("%s_spectrum.eps",epslatex),"-S300,300");
+        end
+
+        peak = max(abs(rx).^2);
+        av = mean(abs(rx).^2);
+        PAPRdB = 10*log10(peak/av);
+        pilotpeak = max(abs(rx(1:160)).^2);
+        pilotav = mean(abs(rx(1:160)).^2);
+        PilotPAPRdB = 10*log10(pilotpeak/pilotav);
+        printf("Pav: %f PAPRdB: %5.2f PilotPAPRdB: %5.2f\n", av, PAPRdB, PilotPAPRdB);
+ 
+        fcentre = 1475;
+        bwHz = bandwidth(rx, fcentre)
+
+        % Spectrum plot with 99% OBW
+        Fs = 8000; y = pwelch(rx,[],[],1024,Fs); y_dB = 10*log10(y);
         mx = max(y_dB); mx = ceil(mx/10)*10
         figure(8); clf; 
         plot((0:length(y)-1)*Fs/length(y),y_dB-mx);
+        hold on;
+        plot([fcentre-bwHz/2 fcentre-bwHz/2 fcentre+bwHz/2 fcentre+bwHz/2 fcentre-bwHz/2 ],[-35 -5 -5 -35 -35],'r-');
+        hold off;
         axis([0 3000 -40 0]); grid; xlabel('Freq (Hz)'); ylabel('dB');
+        if length(png_fn)
+          print("-dpng",sprintf("%s_psd.png",png_fn));
+        end
         if length(epslatex)
           print_eps_restore(sprintf("%s_psd.eps",epslatex),"-S300,200",textfontsize,linewidth);
         end
 
-        max(abs(rx).^2)
-        mean(abs(rx).^2)
-        peak = max(abs(rx).^2);
-        av = mean(abs(rx).^2);
-        PAPRdB = 10*log10(peak/av);
-        peak = max(abs(rx(1:160)).^2);
-        av = mean(abs(rx(1:160)).^2);
-        PilotPAPRdB = 10*log10(peak/av);
-        printf("Pav: %f PAPRdB: %5.2f PilotPAPRdB: %5.2f\n", av, PAPRdB, PilotPAPRdB);
-        bandwidth(rx)
     end
 endfunction
 
@@ -97,21 +120,24 @@ function p = spec_power(y, centre, bandwidth)
 endfunction
 
 
-function bandwidth(rx)
-  Nfft = 1204;
+function bwHz = bandwidth(rx, fcentre)
+  Nfft = 1024;
   Fs = 8000; y = pwelch(rx,[],[],Nfft,Fs); y_dB = 10*log10(y);
   figure(1);
+  % pwelch sometines chooses it's own DFT size
+  Nfft = length(y);
   plot((0:length(y)-1)*Fs/Nfft,y_dB);
 
   % 99% power bandwidth
   total_power = sum(y);
-  centre = round(Nfft*1500/Fs);
+  centre = round(Nfft*fcentre/Fs);
   bw = 1;
   do
     bw++;
     p = spec_power(y, centre, bw);
   until p > 0.99*total_power
-  printf("bandwidth (Hz): %f power/total_power: %f\n", bw*Fs/Nfft, p/total_power);
+  bwHz =  bw*Fs/Nfft;
+  printf("bandwidth (Hz): %f power/total_power: %f\n", bwHz, p/total_power);
 
 endfunction
 
@@ -141,7 +167,9 @@ function loss_EqNo_plot(png_fn, epslatex, varargin)
         plot(data(:,1),data(:,2),sprintf("+-;%s;",leg))
         i++;
     end
-    hold off; grid; xlabel('Eq/No (dB)'); ylabel('loss'); legend('boxoff');
+    hold off; grid('minor'); xlabel('Eq/No (dB)'); ylabel('loss'); legend('boxoff');
+    mn = min(data(:,1))
+    axis([mn mn+25 0.05 0.25])
     if length(png_fn)
         print("-dpng",png_fn);
     end
@@ -151,9 +179,13 @@ function loss_EqNo_plot(png_fn, epslatex, varargin)
 endfunction
 
 % Plots loss v C/No curves from text files dumped by train.py, pass in EqNo_file.txt,dim,leg for each curve
-function loss_CNo_plot(png_fn, Rs, B, varargin)
+function loss_CNo_plot(png_fn, epslatex, Rs, B, varargin)
+    if length(epslatex)
+        [textfontsize linewidth] = set_fonts(20);
+    end
     figure(1); clf; hold on;
     i = 1;
+    mn = 100;
     while i <= length(varargin)
         fn = varargin{i};
         data = load(fn);
@@ -161,18 +193,63 @@ function loss_CNo_plot(png_fn, Rs, B, varargin)
         i++; leg = varargin{i}; leg = strrep (leg, "_", " ");
         EqNo = data(:,1);
         CNo = EqNo + 10*log10(Rs*Nc/B);
+        mn = min([mn; CNo]);
         plot(CNo,data(:,2),sprintf("+-;%s;",leg))
         i++;
     end
-    hold off; grid; 
+    hold off; grid('minor'); 
     if B==1
       xlabel('C/No (dB)');
     else
       xlabel('SNR (dB)');
     end
-     ylabel('loss');
+    ylabel('loss');
+    mn = floor(mn);
+    axis([mn mn+25 0.05 0.25])
     if length(png_fn)
         print("-dpng",png_fn);
+    end
+    if length(epslatex)
+        print_eps_restore(epslatex,"-S300,200",textfontsize,linewidth);
+    end
+endfunction
+
+% Plots loss v SNR3k curves from text files dumped by inference.py, see compare_models_inf.py
+% pnsr flag optionally includes PAPR
+function loss_SNR3k_plot(pnsr=0,png_fn, epslatex, varargin)
+    if length(epslatex)
+        [textfontsize linewidth] = set_fonts(20);
+    end
+    figure(1); clf; hold on;
+    i = 1;
+    mn = 100;
+    while i <= length(varargin)
+        fn = varargin{i};
+        data = load(fn);
+        i++; leg = varargin{i}; leg = strrep (leg, "_", " ");
+        SNR3k = data(:,1);
+        if pnsr
+          SNR3k += data(:,3);
+        end
+        mn = min([mn; SNR3k]);
+        plot(SNR3k,data(:,2),leg)
+        i++;
+    end
+    hold off; grid('minor');
+    if pnsr
+      xlabel('PNR (dB)');
+    else
+      xlabel('SNR (dB)');
+    end
+    ylabel('loss');
+    mn = floor(mn);
+    axis([-5 20 0.05 0.35])
+    legend('boxoff');
+    if length(png_fn)
+        print("-dpng",png_fn);
+    end
+    if length(epslatex)
+        print_eps_restore(epslatex,"-S300,300",textfontsize,linewidth);
     end
 endfunction
 
@@ -257,7 +334,7 @@ function test_rate_Fs_bottleneck
   
 end
 
-% Latex plotting for SNR estimator. run est_snr_curves.sh first
+% Latex plotting for V1 SNR estimator. run est_snr_curves.sh first
 function est_snr_plot(epslatex="")
     if length(epslatex)
         [textfontsize linewidth] = set_fonts();
@@ -452,29 +529,37 @@ function test_phase_est
   hold off
 endfunction
 
-function compare_pitch_corr(wav_fn,feat1_fn,feat2_fn,png_feat_fn="")
-  Fs=16000;
+function compare_features(wav_fn, rx_fn, f_fn,f_hat_fn,f=19,png_feat_fn="")
+  Fs=16000; secs=5;
   s=load_raw(wav_fn);
-  feat1=load_f32(feat1_fn,36);
-  feat2=load_f32(feat2_fn,36);
+  feat1=load_f32(f_fn,36);
+  feat2=load_f32(f_hat_fn,36);
+  rx=load_f32(rx_fn,1); 
+  rx=rx(1:2:end)+j*rx(2:2:end); 
 
-  % plot a few features over first 5 seconds
+  % plot speech, rx signal, feature over first 5 seconds
 
-  x_wav=(1:Fs*5);
+  x_wav=(1:Fs*secs);
   x=1:min(500,length(feat2));
+  
   figure(1); clf;
+  
   subplot(311);
   plot(s(x_wav),'g'); 
   axis([0 max(x_wav) -3E4 3E4]);
+  
   subplot(312);
-  plot(x,feat1(x,19),'g;fargan;');
-  hold on;  plot(x,feat2(x,19),'r;radae;'); hold off;
-  ylabel('Pitch'); axis([0 max(x) -1 1]);
+  plot(x,feat1(x,f),'g;f;');
+  hold on;  plot(x,feat2(x,f),'r;f\_hat;'); hold off;
+  ylabel(sprintf("feature %d",f)); 
+  % axis([0 max(abs) -1 1]);
+  
   subplot(313);
-  plot(x,feat1(x,20),'g;fargan;');
-  hold on; plot(x,feat2(x,20),'r;radae;'); hold off;
-  ylabel('Corr'); xlabel('10ms frames');
-  axis([0 max(x) -0.6 0.6])
+  Fs2=8000;
+  x_wav_8k=(1:Fs2*secs)+Fs2;
+  length(x_wav_8k)
+  plot_specgram(rx(x_wav_8k), Fs=8000, 0, 3000);
+
   if length(png_feat_fn)
     print("-dpng",png_feat_fn,"-S1200,800");
   end
@@ -495,3 +580,95 @@ function plot_sample_spec(wav_fn,png_spec_fn="")
     print("-dpng",png_spec_fn,"-S800,600");
   end
 end
+
+function plot_ber_EbNodB(lin_fn,mse_fn="",phase_fn="",png="", epslatex="")
+  if length(epslatex)
+    [textfontsize linewidth] = set_fonts(20);
+  end
+  figure(1); clf;
+  lin=load(lin_fn);
+  semilogy(lin(:,1),lin(:,2),'bo-;lin;')
+  hold on;
+  if length(mse_fn)
+    mse=load(mse_fn);
+    semilogy(mse(:,1),mse(:,2),'g+-;mse;')
+  end
+  if length(phase_fn)
+    phase=load(phase_fn);
+    semilogy(phase(:,1),phase(:,2),'rx-;phase;')
+  end
+  EbNoLin = 10.^(lin(:,1)/10);
+  theory = 0.5*erfc(sqrt(EbNoLin));
+  semilogy(lin(:,1),theory,'bk+-;theory;')
+  hold off;
+  grid; xlabel('Eb/No (dB)'); ylabel('BER');
+  axis([lin(1,1) lin(end,1) 1E-3 5E-1]);
+  if length(png)
+    print("-dpng",png,"-S800,600");
+  end
+  if length(epslatex)
+    print_eps_restore(epslatex,"-S300,300",textfontsize,linewidth);
+  end
+
+end
+
+function plot_v2_logs(png_fn, state_fn, delta_hat_fn, delta_hat_g_fn, freq_offset_fn, gain_fn, snr_fn)
+  state = load_raw(state_fn);
+  delta_hat = load_f32(delta_hat_fn,1);
+  delta_hat_g = load_f32(delta_hat_g_fn,1);
+  freq_offset = load_f32(freq_offset_fn,1);
+  gain = load_f32(gain_fn,1);
+  snr = load_f32(snr_fn,1);
+  l = length(state);
+  figure(1); clf;
+  subplot(6,1,1); plot(state,'b;state;');
+  axis([0 l -0.1 1.1]); legend('boxoff')
+  subplot(6,1,2:3);
+  plot(delta_hat,'g;delta\_hat;'); 
+  hold on;
+  plot(delta_hat_g,'b;delta\_hat\_g;');
+  hold off;
+  axis([0 l 0 170]); grid; legend('boxoff')
+  subplot(6,1,4);
+  plot(freq_offset,'b;freq\_offset;'); grid; legend('boxoff')
+  subplot(6,1,5);
+  plot(gain,'b;gain;'); grid; legend('boxoff')
+  subplot(6,1,6);
+  plot(snr,'b;snr dB;'); axis([0 l -10 20]); grid; legend('boxoff')
+
+  if length(png_fn)
+    print("-dpng",png_fn,"-S800,1200");
+  end
+end
+
+% Latex plotting for V2 SNR estimator for V2 test report, first run:
+%
+% ./test/snr_est_test.sh --channel awgn | tee snr_est_awgn.txt
+% ./test/snr_est_test.sh --channel mpg | tee snr_est_mpg.txt
+% ./test/snr_est_test.sh --channel mpp | tee snr_est_mpp.txt
+
+function v2_est_snr_plot(epslatex="")
+    if length(epslatex)
+        [textfontsize linewidth] = set_fonts();
+    end
+    awgn = load("snr_est_awgn.txt");
+    mpg = load("snr_est_mpg.txt");
+    mpp = load("snr_est_mpp.txt");
+    
+    figure(1); clf;
+    plot(-5:15, -5:15,'bk--;ideal;');
+    hold on;
+    #[m b] = linreg(awgn(:,2), awgn(:,3),length(awgn(:,1)));
+    plot(awgn(:,2), awgn(:,3),'g-;AWGN;');
+    #[m b] = linreg(mpg(:,2), mpg(:,3),length(mpg(:,1)));
+    plot(mpg(:,2),mpg(:,3),'b-;MPG;');
+    #[m b] = linreg(mpp(:,2), mpp(:,3),length(mpp(:,1)));
+    plot(mpp(:,2),mpp(:,3),'r-;MPP;');
+    hold off;
+    axis([-5 15 -5 15]); legend('location','southeast'); legend('boxoff');
+    grid('minor'); xlabel('SNR (dB)'); ylabel('SNR Est (dB)');
+    if length(epslatex)
+        print_eps_restore(sprintf("%s",epslatex),"-S300,250",textfontsize,linewidth);
+    end
+endfunction
+

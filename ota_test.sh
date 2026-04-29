@@ -2,7 +2,7 @@
 # ota_test.sh
 #
 # Stored file Over The Air (OTA) test for Radio Autoencoder:
-#   + Given an input speech wave file, constructs a chirp-compressed SSB-radae signal tx.wav
+#   + Given an input speech wave file, constructs a chirp-compressed SSB-rade1-rade2 signal tx.wav
 #   + Transmit the tx.wav over a COTS radio, receive to a rx.wav
 #   + Process rx.wav to measure the SNR, decodes the radae audio and extract SSB for comparison
 #
@@ -10,20 +10,14 @@
 # --------------------------------------
 #
 # 1. Install python3, sox, octave, octave signal processing toolbox
-# 2. Clone and build codec2-dev/master, as we use a few utilities
-#    cd codec2
-#    mkdir build_linux
-#    cd build_linux
-#    cmake -DUNITTEST=1 ..
-#    make ch mksine tlininterp
-# 3. Hamlib cli tools (rigctl), and add user to dialout group, e.g. for "david" user:
+# 2. Hamlib cli tools (rigctl), and add user to dialout group, e.g. for "david" user:
 #      sudo apt install libhamlib-utils
 #      sudo adduser david dialout
 #      logout/log back in and check "groups" includes dialout
-# 4. Test rigctl (change model number for your radio):
-#      echo "m" | rigctl -m 3061 -r /dev/ttyUSB0
-# 5. Using Settings to make sure default sound device is not the radio
-# 6. Adjust HF radio Tx drive so ALC is just being tickled, set desired RF power:
+# 3. Test rigctl (change model number for your radio):
+#      echo "m" | rigctl -m 361 -r /dev/ttyUSB0
+# 4. Using Settings to make sure default sound device is not the radio
+# 5. Adjust HF radio Tx drive so ALC is just being tickled, set desired RF power:
 #      ./ota_test.sh wav/david_vk5dgr.wav -x
 #      aplay -f S16_LE --device="plughw:CARD=CODEC,DEV=0" tx.wav
 #
@@ -31,36 +25,34 @@
 # -----
 #
 # 1. File based I/O example:
-#    ./ota_test.sh wav/peter.wav -x 
-#    ~/codec2-dev/build_linux/src/ch tx.wav - --No -20 | sox -t .s16 -r 8000 -c 1 - rx.wav
+#    ./ota_test.sh wav/peter.wav -x
+#    build/src/ch tx.wav - --No -20 | sox -t .s16 -r 8000 -c 1 - rx.wav
 #    ./ota_test.sh -r rx.wav
-#    aplay rx_ssb.wav rx_radae.wav
+#    aplay rx_ssb.wav rx_radae1.wav rx_radae2.wav
 #
-# 2. Use IC-7200 SSB radio to Tx
-#    ./ota_test.sh wav/david_vk5dgr.wav -d -f 14236
-# 
-# 3. Process file rx.wav received off. First use a wav file editor to trim any silence from start, then: 
-#    ./ota_test.sh -r rx.wav
-#    Then listen to rx_ssb.wav and rx_radae.wav
+# 2. Use IC-7200 SSB radio to Tx (first generate tx.raw, then tx it on 7160 kHz)
+#    ./ota_test.sh wav/david_vk5dgr.wav -x -d
+#    ./ota_test.sh tx.raw -t -d -f 7160
+# 3. Process file rx.wav received off air (e.g. via an online SDR)
+#    a) First use a wav file editor to trim the silence from the end of rx.wav to be around 1 second long, as
+#       the length of the wave file after the chrip is used to extract each sample.  Then: 
+#       ./ota_test.sh -r rx.wav
+#    b) If you are supplying the input wave file with the -l option (to measure loss), you don't need to trim:
+#       ./ota_test.sh -r rx.wav -l wav/david_vk5dgr.wav
+#       Note the loss numbers display at the end, showing the loss between the tx and rx features
 #
-# 4. Use HackRF to Tx SSB + radae at 144.5 MHz
-#    ./ota_test.sh wav/peter.wav -x -h
-#    hackrf_transfer -t tx.iq8 -s 4E6 -f 143.5E6 -R
-#    Note tx.iq8 has at +1 MHz offset, so we tune the HackRF 1 MHz low
-#  
+#    You can listen to rx_ssb.wav, rx_radae1.wav, rx_radae2.wav, which will be store in the path of your rx wav file.
+#
+PATH=${PATH}:${PWD}/build/src
 
-# TODO: way to adjust /build_linux/src for OSX
-CODEC2_DEV=${CODEC2_DEV:-${HOME}/codec2-dev}
-PATH=${PATH}:${CODEC2_DEV}/build_linux/src:${CODEC2_DEV}/build_linux/misc:${PWD}/build/src
-
-which ch >/dev/null || { printf "\n**** Can't find ch - check CODEC2_PATH **** \n\n"; exit 1; }
+which ch >/dev/null || { printf "\n**** Can't find ch - check radae build (build/src/ch) **** \n\n"; exit 1; }
 
 kiwi_url=""
 port=8074
 freq_kHz="7177"
 Nbursts=5
-model=3061
-gain=6
+model=361
+comp_gain=6
 serialPort="/dev/ttyUSB0"
 rxwavefile=0
 soundDevice="plughw:CARD=CODEC,DEV=0"
@@ -71,9 +63,9 @@ setpoint_rms=6000
 setpoint_peak=16384
 freq_offset=0
 peak=1
-hackrf=0
 tx_path="."
 just_tx=0
+loss_input_wav_file=""
 
 source utils.sh
 
@@ -81,15 +73,15 @@ function print_help {
     echo
     echo "Automated Over The Air (OTA) voice test for Radio Autoencoder"
     echo
-    echo "  usage ./ota_test.sh InputSpeechWaveFile (prepare tx.wav and Tx using radio)"
-    echo "  usage ./ota_test.sh -x InputSpeechWaveFile (prepare tx.wav)"
+    echo "  usage ./ota_test.sh -x InputSpeechWaveFile (generate tx.raw/tx.wav)"
+    echo "  usage ./ota_test.sh -t tx.raw (transmit tx.raw)"
     echo "  usage ./ota_test.sh -r RxWaveFile (process RxWaveFile)"
     echo
     echo "    -c dev                    The sound device (in ALSA format on Linux, CoreAudio for macOS)"
     echo "    -d                        Debug mode; trace script execution"
-    echo "    -g                        SSB (analog) compressor gain"
+    echo "    -g                        SSB (analog) compressor gain in dB"
     echo "    -i StationIDWaveFile      Prepend this file to identify transmission (should be 8kHz mono)"
-    echo "    -k                        Generate HackRF output file tx.iq8"
+    echo "    -l InputSpeechWaveFile    (rx) calculate ML decoder "loss" using wav_features_in/wav_features_out_tx files generated by -x"
     echo "    -o model                  Select radio model number ('rigctl -l' to list)"
     echo "    -r RxWaveFile             Process supplied rx wave file"
     echo "    -s SerialPort             The serial port (or hostname:port) to control SSB radio,"
@@ -124,6 +116,7 @@ function process_rx {
     echo "-----------------------------------------------"
     # Place results in same path, same file name as input file
     filename="${1%.*}"
+    loss_input_wav_file=$3
      
     rx=$(mktemp).wav
     sox $1 -c 1 -r 8k $rx
@@ -131,7 +124,7 @@ function process_rx {
     DISPLAY=""; echo "pkg load signal; warning('off', 'all'); \
           s=load_raw('$rx'); \
           plot_specgram(s, 8000, 200, 3000); print('${filename}_spec.jpg', '-djpg'); \
-          quit" | octave-cli -p ${CODEC2_PATH}/octave -qf > /dev/null
+          quit" | octave-cli -p ${PWD} -qf > /dev/null
 
     # extract chirp at start and estimate C/No, and chirp start time.  We allow a 10 second window
     rx_chirp=$(mktemp)
@@ -148,20 +141,61 @@ function process_rx {
     sox $rx $rx_trim trim $chirp_start
     cp $rx_trim $rx
 
-    # 4 sec chirp - 1 sec silence - x sec SSB - 1 sec silence - x sec RADAE
-    # start_radae = 4+1+x
-    total_duration=$(sox --info -D $rx)
-    x=$(python3 -c "x=(${total_duration}-6)/2; print(\"%f\" % x)")
-    start_radae=$(python3 -c "start_radae=5+${x}; print(\"%f\" % start_radae)")
-    rx_radae=$(mktemp)
+    # 4 sec chirp - 1 sec sil - x sec SSB - 1 sec sil - 1+x sec rade1 - 1 sec sil - 1+x sec rade 2 - 1 sec sil
+    # total = 4 + 6 + 3x
+    # start_rade1 = 4+(1+x)
+    # start_rade2 = 4+2*(1+x)
+    if [ ! ${loss_input_wav_file} == "" ]; then
+      # we have input wav file so work out length based on that
+      x=$(sox --info -D $loss_input_wav_file)
+    else
+      # work out length based on assumption of 1 sec silence at end 
+      total_duration=$(sox --info -D $rx)
+      x=$(python3 -c "x=(${total_duration}-10)/3; print(\"%f\" % x)")
+    fi
+    
+    start_rade1=$(python3 -c "start_rade1=6+${x}+0.5; print(\"%f\" % start_rade1)")
+    len_rade=$(python3 -c "len_rade=${x}+1.5; print(\"%f\" % len_rade)")
+    start_rade2=$(python3 -c "start_rade2=8+2*${x}; print(\"%f\" % start_rade2)")
+    len_rade2=$(python3 -c "len_rade2=${x}+2.5; print(\"%f\" % len_rade2)")
+    rx_rade1=$(mktemp)
+    rx_rade2=$(mktemp)
     sox $rx ${filename}_ssb.wav trim 5 $x
-    sox $rx -t .s16 ${rx_radae}.raw trim $start_radae
-    sox -t .s16 -r 8000 -c 1 ${rx_radae}.raw radae_in.wav # wave version for debugging
+    sox $rx -t .s16 ${rx_rade1}.raw trim $start_rade1 $len_rade
+    sox -t .s16 -r 8000 -c 1 ${rx_rade1}.raw rade1_in.wav # wave version for debugging
+    sox $rx -t .s16 ${rx_rade2}.raw trim $start_rade2 $len_rade2
+    sox -t .s16 -r 8000 -c 1 ${rx_rade2}.raw rade2_in.wav # wave version for debugging
 
-    # Use streaming RADAE Rx
-    cat ${rx_radae}.raw | python3 int16tof32.py --zeropad > ${rx_radae}.f32
-    cat ${rx_radae}.f32 | python3 radae_rxe.py --model model19_check3/checkpoints/checkpoint_epoch_100.pth -v 2 2>>${filename}_report.txt > features_rx_out.f32
-    lpcnet_demo -fargan-synthesis features_rx_out.f32 - | sox -t .s16 -r 16000 -c 1 - ${filename}_radae.wav
+    # Use streaming RADE1 Rx
+    cat ${rx_rade1}.raw | python3 int16tof32.py --zeropad > ${rx_rade1}.f32
+    cat ${rx_rade1}.f32 | python3 radae_rxe.py --model model19_check3/checkpoints/checkpoint_epoch_100.pth -v 2 2>>${filename}_report.txt > features_out_rx1.f32
+    lpcnet_demo -fargan-synthesis features_out_rx1.f32 - | sox -t .s16 -r 16000 -c 1 - ${filename}_rade1.wav
+    
+    # extract freq offset est from RADE V1
+    rade1_foff_samples=$(mktemp)
+    # sed ensures all lines have a leading whitespace
+    cat ${filename}_report.txt | grep sync | sed 's/^/  /' | tr -s ' ' | cut -d' ' -f17 > $rade1_foff_samples
+    rade1_foff=$(python3 -c "import numpy as np; foff_samples=np.loadtxt(\"${rade1_foff_samples}\"); print(f\"{np.mean(foff_samples)}\") ")
+
+    # RADE2 Rx
+    cat ${rx_rade2}.raw | python3 int16tof32.py --zeropad > ${rx_rade2}.f32
+    ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync ${rx_rade2}.f32 ${filename}_rade2.wav \
+    --latent-dim 56 --w1_dec 128 --gain 1.22E-4 --agc --correct_time_offset -8 \
+    --write_state state.int16 --write_delta_hat delta_hat.f32 --write_delta_hat_g delta_hat_g.f32 \
+    --write_gain gain.f32 --write_freq_offset freq_offset.f32 --write_snr_est snr_est.f32 2>>${filename}_report.txt
+    DISPLAY=""; echo "warning('off', 'all'); \
+      radae_plots; \
+      plot_v2_logs('${filename}_plots.png', 'state.int16', 'delta_hat.f32','delta_hat_g.f32','freq_offset.f32','gain.f32','snr_est.f32'); \
+      quit;" | octave-cli -qf > /dev/null
+
+    # optionally calculate loss using feature files derived from input wave file basename
+    if [ ! ${loss_input_wav_file} == "" ]; then
+      speechfile_no_path_no_ext="${loss_input_wav_file##*/}" # Removes path
+      speechfile_no_path_no_ext="${speechfile_no_path_no_ext%.*}" # Removes extension
+      # optional loss measurements
+      python3 loss.py ${speechfile_no_path_no_ext}_features_in.f32 ${speechfile_no_path_no_ext}_features_out_tx1.f32 --features_hat2 features_out_rx1.f32 --compare --clip_start 25 | sed -n '5p' | tee -a ${filename}_report.txt
+      python3 loss.py ${speechfile_no_path_no_ext}_features_in.f32 ${speechfile_no_path_no_ext}_features_out_tx2.f32 --features_hat2 features_out_rx2.f32 --compare --clip_start 25 | sed -n '5p' | tee -a ${filename}_report.txt
+    fi
 }
 
 function tx_ssb_radio {
@@ -218,7 +252,7 @@ case $key in
         shift
     ;;
     -g)
-        gain="$2"	
+        comp_gain="$2"	
         shift
         shift
     ;;
@@ -227,12 +261,13 @@ case $key in
         shift
         shift
     ;;
-    -k)
-        hackrf=1
-        shift
-    ;;
     -o)
         model="$2"	
+        shift
+        shift
+    ;;
+    -l)
+        loss_input_wav_file="$2"	
         shift
         shift
     ;;
@@ -292,7 +327,7 @@ if [ $rxwavefile -eq 1 ]; then
         echo "Can't find input wave file: ${1}!"
         exit 1
     fi   
-    process_rx $1 $freq_offset
+    process_rx $1 $freq_offset $loss_input_wav_file
     exit 0
 fi
 
@@ -317,14 +352,18 @@ if [ $channels -ne 1 ] || [ $sample_rate -ne 16000 ]; then
     exit 1 
 fi
 
+# extract speechfile name without path or extension
+speechfile_no_path_no_ext="${speechfile##*/}" # Removes path
+speechfile_no_path_no_ext="${speechfile_no_path_no_ext%.*}" # Removes extension
+
 # create Tx file ------------------------
 
 # create 400-2000 Hz chirp header used for C/No est.  We generate 4.5s of chirp, to allow for trimming of
 # rx wave file - we need >=4 seconds of received chirp for C/No est at Rx
 
-echo "--------------------------------------------------------"
-echo "Creating chirp - compressed SSB - RADAE wave file tx.wav"
-echo "--------------------------------------------------------"
+echo "----------------------------------------------------------------"
+echo "Creating chirp - compressed SSB - RADE1 - RADE2 wave file tx.wav"
+echo "----------------------------------------------------------------"
 
 chirp=$(mktemp)
 if [ $peak -eq 1 ]; then
@@ -338,51 +377,69 @@ cat ${chirp}.f32 | python3 f32toint16.py --real > ${chirp}.raw
 
 # create compressed SSB signal
 speechfile_raw_8k=$(mktemp)
-comp_in=$(mktemp)
 tx_ssb=$(mktemp)
-tx_radae=$(mktemp)
+tx_radae1=tx_rade1
+tx_radae2=tx_rade2
 # With 16kHz input files, we need an 8kHz version for SSB
 sox $speechfile -r 8000 -t .s16 -c 1 $speechfile_raw_8k
-if [ -z $stationid ]; then
-    cp $speechfile_raw_8k $comp_in
-else
-    # append station ID
-    stationid_raw_8k=$(mktemp)
-    sox $stationid -r 8000 -t .s16 -c 1 $stationid_raw_8k
-    cat  $stationid_raw_8k $speechfile_raw_8k > $comp_in
-fi
-analog_compressor $comp_in $tx_ssb $gain
+analog_compressor $speechfile_raw_8k $tx_ssb $comp_gain
 
 # insert an extra second of silence at start of radae speech input to make sync easier
 speechfile_pad=$(mktemp).wav
 sox $speechfile $speechfile_pad pad 1@0
 
-# create modulated radae signal
-./inference.sh model19_check3/checkpoints/checkpoint_epoch_100.pth $speechfile_pad /dev/null --end_of_over --auxdata --EbNodB 100 --bottleneck 3 --pilots --cp 0.004 --rate_Fs --write_rx ${tx_radae}.f32
+# create modulated radae V1 signal
+echo "Creating RADE V1"
+./inference.sh model19_check3/checkpoints/checkpoint_epoch_100.pth $speechfile_pad /dev/null --end_of_over --auxdata --EbNodB 100 \
+--bottleneck 3 --pilots --cp 0.004 --rate_Fs --tanh --ssb_bpf --write_rx ${tx_radae1}.f32
+# save features in/out for later "loss.py" measurments
+cp features_in.f32 ${speechfile_no_path_no_ext}_features_in.f32
+cp features_out.f32 ${speechfile_no_path_no_ext}_features_out_tx1.f32
 # extract real (I) channel
-cat ${tx_radae}.f32 | python3 f32toint16.py --real --scale 16383 > ${tx_radae}.raw 
+cat ${tx_radae1}.f32 | python3 f32toint16.py --real --scale 16383 > ${tx_radae1}.raw 
+
+# create modulated radae V2 signal
+echo "Creating RADE V2"
+./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth $speechfile_pad /dev/null --rate_Fs --latent-dim 56 --peak --ssb_bpf --end_of_over_v2 \
+--cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 --write_rx ${tx_radae2}.f32
+# save features in/out for later "loss.py" measurments
+cp features_out.f32 ${speechfile_no_path_no_ext}_features_out_tx2.f32
+# extract real (I) channel
+cat ${tx_radae2}.f32 | python3 f32toint16.py --real --scale 16383 > ${tx_radae2}.raw 
 
 # Make power of both signals the same, by adjusting the levels to meet the setpoint
 if [ $peak -eq 1 ]; then
+  measure_peak $tx_ssb
   set_peak $tx_ssb $setpoint_peak
-  set_peak ${tx_radae}.raw $setpoint_peak
+  set_peak ${tx_radae1}.raw $setpoint_peak
+  set_peak ${tx_radae2}.raw $setpoint_peak
 else
   set_rms $tx_ssb $setpoint_rms
-  set_rms ${tx_radae}.raw $setpoint_rms
+  set_rms ${tx_radae1}.raw $setpoint_rms
+  set_rms ${tx_radae2}.raw $setpoint_rms
 fi
 
 # insert 1 second of silence between signals
 sox -t .s16 -r 8k -c 1 $tx_ssb -t .s16 -r 8k -c 1 ${tx_ssb}_pad.raw pad 1@0
-sox -t .s16 -r 8k -c 1 ${tx_radae}.raw -t .s16 -r 8k -c 1 ${tx_radae}_pad.raw pad 1@0
+sox -t .s16 -r 8k -c 1 ${tx_radae1}.raw -t .s16 -r 8k -c 1 ${tx_radae1}_pad.raw pad 1
+sox -t .s16 -r 8k -c 1 ${tx_radae2}.raw -t .s16 -r 8k -c 1 ${tx_radae2}_pad.raw pad 1 1
 
 # cat signals together so we can send them over a radio at the same time
-cat ${chirp}.raw ${tx_ssb}_pad.raw ${tx_radae}_pad.raw > ${tx_path}/tx.raw
-sox -t .s16 -r 8000 -c 1 ${tx_path}/tx.raw ${tx_path}/tx.wav
+cat ${chirp}.raw ${tx_ssb}_pad.raw ${tx_radae1}_pad.raw  ${tx_radae2}_pad.raw > ${tx_path}/tx.raw
 
-# generate a 4MSP .iq8 file suitable for replaying by HackRF (can disable if not using HackRF)
-if [ $hackrf -eq 1 ]; then
-  ch ${tx_path}/tx.raw - --complexout | tsrc - - 5 -c | tlininterp - tx.iq8 100 -d -f
+if [ ! ${stationid} == "" ]; then
+    # compress and pre-pend station ID
+    stationid_raw_8k=$(mktemp)
+    tx_stationid=$(mktemp)
+    sox $stationid -r 8000 -t .s16 -c 1 $stationid_raw_8k
+    analog_compressor $stationid_raw_8k $tx_stationid $comp_gain
+
+    tmp=$(mktemp)
+    cat $tx_stationid ${tx_path}/tx.raw > $tmp
+    mv $tmp ${tx_path}/tx.raw
 fi
+
+sox -t .s16 -r 8000 -c 1 ${tx_path}/tx.raw ${tx_path}/tx.wav
 
 if [ $tx_file -eq 1 ]; then
   echo "Finished OK!"

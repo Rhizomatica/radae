@@ -62,7 +62,7 @@ class complex_bpf():
 
    def bpf(self, x):
       n = len(x)
-
+      
       # Make sure length is less than the filter length
       assert(n <= self.n)
 
@@ -93,7 +93,7 @@ class complex_bpf():
       np.dot(x_mem_slided, self.h, out=self.x_filt[0:n])
 
       # Save filter state for next time
-      self.mem = self.x_mem[0:len(self.mem) + len(x_baseband)][-self.Ntap-1:]
+      self.mem = self.x_mem[0:len(self.mem) + len(x_baseband)][-(self.Ntap-1):]
 
       # Save phase state for next time
       self.phase = phase_vec[-1]
@@ -107,8 +107,6 @@ def complex_bpf_test(plot_en=0):
    bandwidth_Hz = 800
    centre_freq_Hz = 1000
    print(f"BPF bandwidth: {bandwidth_Hz:f} centre: {centre_freq_Hz:f}")
-   bpf = complex_bpf(Ntap, Fs_Hz, bandwidth_Hz, centre_freq_Hz, Fs_Hz)
-
    # -ve freq component of cos() should be attenuated by at least 40dB
    def complex_bpf_test(rx_bpf, pass_str, plot_en):
 
@@ -126,21 +124,23 @@ def complex_bpf_test(plot_en=0):
       if 10*np.log10(power_pos/power_neg) > 40.0:
          print(pass_str)
          return True
-      return False         
+      return False
 
-   # one filtering operation on entire sample
+   # one filtering operation on entire signal
+   bpf = complex_bpf(Ntap, Fs_Hz, bandwidth_Hz, centre_freq_Hz, Fs_Hz)
    rx = np.cos(2*np.pi*centre_freq_Hz*np.arange(Fs_Hz)/Fs_Hz)    # 1 sec real sinewave
    rx_bpf = bpf.bpf(rx)
    rx_bpf.tofile("complex_bpf_test1.c64")
    print(rx.shape,rx_bpf.shape)
    ok1 = complex_bpf_test(rx_bpf[Ntap-1:],"OK1",plot_en)
- 
-   # test filtering in smaller chunks
+
+   # test filtering in smaller chunks with max_len == chunk size to catch filter state bugs
    Nmf = 960
+   bpf2 = complex_bpf(Ntap, Fs_Hz, bandwidth_Hz, centre_freq_Hz, Nmf)
    Nframes = len(rx)//Nmf
    rx_bpf2 = np.zeros(0,dtype=np.csingle)
    for f in range(Nframes):
-       rx_bpf2 = np.concatenate([rx_bpf2,bpf.bpf(rx[f*Nmf:(f+1)*Nmf])])
+       rx_bpf2 = np.concatenate([rx_bpf2,bpf2.bpf(rx[f*Nmf:(f+1)*Nmf])])
    rx_bpf2.tofile("complex_bpf_test2.c64")
    print(Nframes, rx_bpf2.shape)
    ok2 = complex_bpf_test(rx_bpf2[Ntap-1:],"OK2",plot_en)
@@ -409,11 +409,12 @@ class receiver_one():
          local_path_delay_s = 0.0025      # guess at actual path delay, means a little bit of noise on scatter
          a = local_path_delay_s*self.Fs
          A = torch.tensor([[1, torch.exp(-1j*self.w[c_mid-1]*a)], [1, torch.exp(-1j*self.w[c_mid]*a)], [1, torch.exp(-1j*self.w[c_mid+1]*a)]])
-         self.Pmat[c] = torch.matmul(torch.inverse(torch.matmul(torch.transpose(A,0,1),A)),torch.transpose(A,0,1))
+         AH = torch.conj(torch.transpose(A,0,1))
+         self.Pmat[c] = torch.matmul(torch.inverse(torch.matmul(AH,A)),AH)
 
       self.snrdB_3k_est = 0
-      self.m = 0.8070
-      self.c = 2.513
+      self.m = 0.7650
+      self.c = 4.1343
          
    def est_pilots(self, rx_sym_pilots, num_modem_frames, Nc, Ns):
       rx_pilots = torch.zeros(num_modem_frames+1, Nc, dtype=torch.complex64)
@@ -440,7 +441,7 @@ class receiver_one():
       rx_phase = torch.angle(rx_pilots[0,:])
       Rcn_hat = Pcn_hat * torch.exp(-1j*rx_phase)
       S1 = torch.sum(torch.abs(Pcn_hat)**2)
-      S2 = torch.sum(torch.abs(Rcn_hat.imag)**2) + 1E-12 
+      S2 = torch.sum(torch.abs(Rcn_hat.imag)**2) + 1E-12
       snr_est = S1/(2*S2) - 1
       # remove occasional illegal values
       if snr_est <= 0:

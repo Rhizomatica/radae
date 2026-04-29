@@ -34,19 +34,6 @@ jobs:
         run: |
           pip3 install torch numpy matplotlib tqdm
 
-      - name: Install codec2-dev
-        shell: bash
-        # we have to use a hard coded path as it seems "~" isn't support by Github Actions
-        # using "/home/runner" we seem to link to "~"
-        working-directory: /home/runner/
-        run: |
-          git clone https://github.com/drowe67/codec2-dev.git
-          cd codec2-dev
-          mkdir build_linux
-          cd build_linux
-          cmake -DUNITTEST=1 ..
-          make ch mksine tlininterp
-
       - name: Install radae_nopy
         shell: bash
         working-directory: ${{github.workspace}}
