@@ -6,7 +6,7 @@ RADE V2 builds on V1 with several algorithmic improvements:
 
 | | V1 | V2 |
 | --- | --- | --- |
-| Carriers | 20, includes pilot symbols | 14, data only (no pilots) |
+| Carriers | 30, includes pilot symbols | 14, data only (no pilots) |
 | Equalisation | Classical DSP, pilot-aided | ML-based, no pilots required |
 | 99% Occupied Bandwidth | ~2100 Hz (SSB filter limited) | ~860 Hz |
 | Frame duration | ~180 ms | ~40 ms |
@@ -26,7 +26,7 @@ This repo is the reference Python implementation for RADE V1 and V2. The current
 
 This repo is intended to support experimental work, with just enough information for the advanced experimenter to reproduce aspects of the work. The focus is on waveform development, not software configuration. It is not intended to be packaged for general use or to work across multiple Linux distros and operating systems. Unless otherwise stated, the code in this repo is intended to run only on Ubuntu Linux 22-24 on a non-virtual machine.
 
-For deployment and distribution of RADE V1 please use the C port.  RADE V2 is still under development but we hope to release initial versions soon.
+For deployment and distribution of RADE V1 please use the [C port](https://github.com/peterbmarks/radae_nopy).  RADE V2 is still under development but we hope to make an initial release soon.
 
 # Quickstart
 
@@ -108,11 +108,25 @@ ctest
 ```
 To list tests `ctest -N`, to run just one test `ctest -R inference_model5`, to run in verbose mode `ctest -V -R inference_model5`.
 
+## Listening to modulated RADE
+
 A lot of the tests generate a float IQ sample file.  You can listen to this file with: 
 ```
 cat rx.f32 | python3 f32toint16.py --real --scale 8192 | play -t .s16 -r 8000 -c 1 - bandpass 300 2000
 ```
 The scaling `--scale` is required as the low SNRs mean the noise peak amplitude can clip 16 bit samples if not carefully scaled.
+
+## Optional: RADE V1 C Port Tests (radae_nopy)
+
+The [radae_nopy](https://github.com/peterbmarks/radae_nopy) repo contains a C port of the RADE V1 receiver. Its ctests are optional and only enabled when `RADAE_NOPY_BUILD_DIR` is passed to cmake:
+```
+cd ~
+git clone https://github.com/peterbmarks/radae_nopy.git
+cd radae_nopy && mkdir build && cd build && cmake .. && make
+cd ~/radae/build
+cmake -DRADAE_NOPY_BUILD_DIR=~/radae_nopy/build ..
+ctest -R radae_nopy
+```
 
 
 # Over the Air/Over the Cable (OTA/OTC)

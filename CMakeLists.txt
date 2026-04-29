@@ -655,7 +655,8 @@ add_test(NAME bbfm_sc_bpf_loss
                        python3 loss.py features_in.f32 features_out.f32 --features_hat2 features_rx_out.f32 --compare")
                        set_tests_properties(bbfm_sc_bpf_loss PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
-# RADAE_NOPY C Port tests --------------------------------------------------------------------
+# RADAE_NOPY C Port tests (optional: only enabled when RADAE_NOPY_BUILD_DIR is set) ----------
+if(RADAE_NOPY_BUILD_DIR)
 
 # basic test of streaming Tx/Rx, compare to vanilla Tx in inference.py
 add_test(NAME radae_nopy_tx_basic
@@ -867,6 +868,8 @@ add_test(NAME radae_nopy_ber_awgn
 add_test(NAME radae_nopy_ber_mpp
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; test/radae_nopy_ber_mpp.sh ${RADAE_NOPY_BUILD_DIR}")
          set_tests_properties(radae_nopy_ber_mpp PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+endif() # RADAE_NOPY_BUILD_DIR
+
 # RADE V2 -----------------------------------------------------------------------------------------------
 
 # rx2.sh "4 point" tests
