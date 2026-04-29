@@ -34,28 +34,17 @@ jobs:
         run: |
           pip3 install torch numpy matplotlib tqdm
 
-      - name: Install radae_nopy
-        shell: bash
-        working-directory: ${{github.workspace}}
-        run: |
-          git clone https://github.com/drowe67/radae_nopy.git
-          cd radae_nopy
-          mkdir build
-          cd build
-          cmake ..
-          make
-
       - name: build radae
         shell: bash
         working-directory: ${{github.workspace}}/radae
         run: |
           mkdir build
           cd build
-          cmake -DRADAE_NOPY_BUILD_DIR=${{github.workspace}}/radae_nopy/build ..
-          make
+          cmake ..
+          make -j$(nproc)
 
       - name: run ctests
         shell: bash
         working-directory: ${{github.workspace}}/radae/build
         run: |
-          ctest -V --output-on-failure -R radae_nopy
+          ctest -j1 -V --output-on-failure
