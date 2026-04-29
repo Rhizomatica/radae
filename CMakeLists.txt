@@ -815,7 +815,7 @@ add_test(NAME radae_nopy_eoo_data_mpp
                        cat features_in.f32 | ${RADAE_NOPY_BUILD_DIR}/src/radae_tx > tx.f32; \
                        cat tx.f32 tx.f32 tx.f32 tx.f32 tx.f32 > tx_2.f32;
                        cat tx_2.f32 | python3 f32toint16.py --real --scale 8192 > tx.raw; \
-                       ${CODEC2_DEV_BUILD_DIR}/src/ch tx.raw rx.raw --No -24 --mpp --fading_dir .; \
+                       ${CMAKE_BINARY_DIR}/src/ch tx.raw rx.raw --No -24 --mpp --fading_dir .; \
                        cat rx.raw | python3 int16tof32.py --zeropad > rx.f32; \
                        cat rx.f32 | ${RADAE_NOPY_BUILD_DIR}/src/radae_rx > /dev/null; \
                        python3 eoo_ber.py eoo_tx.f32 eoo_rx.f32")
