@@ -14,3 +14,5 @@ fi
 if [ ! -f g_mpp_high.f32 ]; then
   DISPLAY="" echo "multipath_samples('mpp_high', 8000, 50, 14, 10, '', 'g_mpp_high.f32'); quit" | octave-cli -qf
 fi
+
+cp g_mpp.f32 fast_fading_samples.float

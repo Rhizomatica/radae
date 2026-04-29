@@ -6,7 +6,7 @@ RADE V2 builds on V1 with several algorithmic improvements:
 
 | | V1 | V2 |
 | --- | --- | --- |
-| Carriers | 20, includes pilot symbols | 14, data only (no pilots) |
+| Carriers | 30, includes pilot symbols | 14, data only (no pilots) |
 | Equalisation | Classical DSP, pilot-aided | ML-based, no pilots required |
 | 99% Occupied Bandwidth | ~2100 Hz (SSB filter limited) | ~860 Hz |
 | Frame duration | ~180 ms | ~40 ms |
@@ -22,23 +22,30 @@ The elimination of pilot symbols in V2 recovers the bandwidth and power they con
 
 # Scope
 
-This repo is the reference Python implementation for RADE V1 and V2. The current focus is on RADE V2, however it also contains RADE V1 ctests.
+This repo is the reference Python implementation for RADE V1 and V2. The current focus is on RADE V2 development, however this repo also contains RADE V1 (including many ctests).
 
-This repo is intended to support experimental work, with just enough information for the advanced experimenter to reproduce aspects of the work. The focus is on waveform development, not software configuration. It is not intended to be packaged for general use or to work across multiple Linux distros and operating systems. Unless otherwise stated, the code is this repo is intended to run only on Ubuntu Linux 22-24 on a non-virtual machine.
+This repo is intended to support experimental work, with just enough information for the advanced experimenter to reproduce aspects of the work. The focus is on waveform development, not software configuration. It is not intended to be packaged for general use or to work across multiple Linux distros and operating systems. Unless otherwise stated, the code in this repo is intended to run only on Ubuntu Linux 22-24 on a non-virtual machine.
 
-For deployment and distribution of RADE V1 and V2, please use the C ports.
+For deployment and distribution of RADE V1 please use the [C port](https://github.com/peterbmarks/radae_nopy).  RADE V2 is still under development but we hope to make an initial release soon.
 
 # Quickstart
 
 1. Installation section below.
-1. Example Tx and Rx: 
+1. RADE V2 Tx and Rx example:
    ```
    ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/brian_g8sez.wav /dev/null --rate_Fs --latent-dim 56 \
-    --peak --cp 0.004 --time_offset -16 --correct_time_offset -8 --auxdata --w1_dec 128 --write_rx 250725_rx.f32 
+    --peak --cp 0.004 --time_offset -16 --correct_time_offset -8 --auxdata --w1_dec 128 --write_rx 250725_rx.f32
    ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync 250725_rx.f32 test.wav
    play test.wav
    ```
-1. `test/v2_spot.sh` is a good starting point for experimentation.
+1. RADE V1 Tx and Rx example:
+   ```
+   ./inference.sh model19_check3/checkpoints/checkpoint_epoch_100.pth wav/brian_g8sez.wav /dev/null \
+    --rate_Fs --pilots --pilot_eq --eq_ls --cp 0.004 --bottleneck 3 --auxdata --write_rx v1_rx.f32
+   cat v1_rx.f32 | python3 radae_rxe.py --model model19_check3/checkpoints/checkpoint_epoch_100.pth > features_out.f32
+   ./build/src/lpcnet_demo -fargan-synthesis features_out.f32 - | aplay -f S16_LE -r 16000
+   ```
+1. `test/v2_spot.sh` is a good starting point for RADE V2 experimentation.
    
 # Reference and License
 
@@ -52,6 +59,7 @@ The RADE source code is released under the two-clause BSD license.
 | --- | --- |
 | `inference.py` / `inference.sh` | RADE V2 transmitter: encodes speech and modulates to a complex IQ sample file |
 | `rx2.py` / `rx2.sh` | RADE V2 receiver: stateful, streaming decoder |
+| `radae_txe.py` / `radae_rxe.py` | RADE V1 transmitter and receiver |
 | `radae/radae.py` | Core RADE model definition (encoder, channel layer, decoder) |
 | `train.py` | Training script for the RADE encoder/decoder |
 | `ml_sync.py` / `models_sync.py` | ML frame sync: trains and runs the neural frame synchroniser |
@@ -100,11 +108,25 @@ ctest
 ```
 To list tests `ctest -N`, to run just one test `ctest -R inference_model5`, to run in verbose mode `ctest -V -R inference_model5`.
 
+## Listening to modulated RADE
+
 A lot of the tests generate a float IQ sample file.  You can listen to this file with: 
 ```
 cat rx.f32 | python3 f32toint16.py --real --scale 8192 | play -t .s16 -r 8000 -c 1 - bandpass 300 2000
 ```
 The scaling `--scale` is required as the low SNRs mean the noise peak amplitude can clip 16 bit samples if not carefully scaled.
+
+## Optional: RADE V1 C Port Tests (radae_nopy)
+
+The [radae_nopy](https://github.com/peterbmarks/radae_nopy) repo contains a C port of the RADE V1 receiver. Its ctests are optional and only enabled when `RADAE_NOPY_BUILD_DIR` is passed to cmake:
+```
+cd ~
+git clone https://github.com/peterbmarks/radae_nopy.git
+cd radae_nopy && mkdir build && cd build && cmake .. && make
+cd ~/radae/build
+cmake -DRADAE_NOPY_BUILD_DIR=~/radae_nopy/build ..
+ctest -R radae_nopy
+```
 
 
 # Over the Air/Over the Cable (OTA/OTC)
