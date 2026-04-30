@@ -200,6 +200,8 @@ Automatic Speech Recognition (ASR) is used as an objective speech quality metric
    pip3 install jiwer openai-whisper
    ```
 
+1. The LibriSpeech `test-clean` dataset (~400 MB) is downloaded automatically to `~/.cache/LibriSpeech/` on first run via `torchaudio`.
+
 1. Run controls (clean speech, FARGAN vocoder only, 4 kHz bandwidth):
    ```
    ./asr_test.sh clean && ./asr_test.sh fargan && ./asr_test.sh 4kHz
