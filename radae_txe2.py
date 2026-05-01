@@ -67,7 +67,7 @@ class radae_tx_v2:
 
     def __init__(self, model_name,
                  latent_dim=56, bottleneck=3, cp=0.004,
-                 time_offset=-16, correct_time_offset=-16,
+                 time_offset=-16, correct_time_offset=-8,
                  w1_dec=128, peak=True, auxdata=True,
                  txbpf_en=False):
 
@@ -214,7 +214,7 @@ def _build_argparser():
     p.add_argument('--bottleneck', type=int, default=3)
     p.add_argument('--cp', type=float, default=0.004)
     p.add_argument('--time_offset', type=int, default=-16)
-    p.add_argument('--correct_time_offset', type=int, default=-16)
+    p.add_argument('--correct_time_offset', type=int, default=-8)
     p.add_argument('--w1_dec', type=int, default=128)
     p.add_argument('--nopeak', dest='peak', action='store_false',
                    help='disable peak=True training flag (default enabled)')
