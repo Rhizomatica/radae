@@ -324,7 +324,7 @@ class RADEv2Receiver:
 
    def _detect_eoo(self):
       """Detect EOO using channel time-domain sparsity."""
-      pend_fd = np.fft.fft(self.model.pend.numpy())
+      pend_fd = np.fft.fft(self.model.pend.detach().cpu().numpy())
       rx_fd   = np.fft.fft(self.rx_sym_td)
       active  = np.abs(pend_fd) > np.max(np.abs(pend_fd)) * 1e-3
       H_est   = np.zeros(self.M, dtype=np.complex64)
@@ -423,7 +423,7 @@ class RADEv2Transmitter:
          # Streaming complex BPF with same parameters as model
          from radae import complex_bpf as ComplexBPF
          Ntap      = 101
-         w         = model.w.cpu().numpy()
+         w         = model.w.detach().cpu().numpy()
          Fs        = float(model.Fs)
          bandwidth = 1.2 * (w[model.Nc - 1] - w[0]) * Fs / (2 * np.pi)
          centre    = (w[model.Nc - 1] + w[0]) * Fs / (2 * np.pi) / 2
@@ -465,4 +465,4 @@ class RADEv2Transmitter:
 
    def eoo(self):
       """Return the V2 end-of-over sequence as complex64 IQ samples."""
-      return self.model.eoo_v2.numpy().flatten().astype(np.csingle)
+      return self.model.eoo_v2.detach().cpu().numpy().flatten().astype(np.csingle)
