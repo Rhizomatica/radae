@@ -191,6 +191,40 @@ This section is optional - pre-trained models that run on a standard laptop CPU 
    ```
 
 
+# ASR Tests
+
+Automatic Speech Recognition (ASR) is used as an objective speech quality metric to compare RADE V1 against SSB and FreeDV 700D. The [Whisper](https://github.com/openai/whisper) ASR model scores Word Error Rate (WER) on LibriSpeech samples passed through the modems under test.
+
+1. Install dependencies:
+   ```
+   pip3 install jiwer openai-whisper
+   ```
+
+1. The LibriSpeech `test-clean` dataset (~400 MB) is downloaded automatically to `~/.cache/LibriSpeech/` on first run via `torchaudio`.
+
+1. Run controls (clean speech, FARGAN vocoder only, 4 kHz bandwidth):
+   ```
+   ./asr_test.sh clean && ./asr_test.sh fargan && ./asr_test.sh 4kHz
+   ```
+
+1. Run a sweep across AWGN channel conditions for each mode (100 samples):
+   ```
+   ./asr_test_top.sh ssb -n 100
+   ./asr_test_top.sh rade -n 100
+   ./asr_test_top.sh 700D -n 100
+   ```
+
+1. For MPP channel, first generate fading samples (if not already present), then re-run with `--g_file`:
+   ```
+   ./test/make_g.sh
+   ./asr_test_top.sh rade -n 100 --g_file g_mpp.f32
+   ```
+
+1. Plot WER curves in Octave:
+   ```
+   octave:1> radae_plots; plot_wer("241221","241221_asr_test.png")
+   ```
+
 # C Port of Core Encoder and Decoder
 
 The following describes the V1 C port.  A V2 C port is planned as future work.

@@ -672,3 +672,106 @@ function v2_est_snr_plot(epslatex="")
     end
 endfunction
 
+
+# ASR Word Error Rate plots -------------------------------------------------------
+
+function plot_wer(prefix_fn, png_fn="", epslatex="")
+  ssb_awgn_fn = sprintf("%s_asr_awgn_ssb.txt",prefix_fn);
+  rade_awgn_fn = sprintf("%s_asr_awgn_rade.txt",prefix_fn);
+  freedv_700D_awgn_fn = sprintf("%s_asr_awgn_700D.txt",prefix_fn);
+  ssb_mpp_fn = sprintf("%s_asr_mpp_ssb.txt",prefix_fn);
+  rade_mpp_fn = sprintf("%s_asr_mpp_rade.txt",prefix_fn);
+  freedv_700D_mpp_fn = sprintf("%s_asr_mpp_700D.txt",prefix_fn);
+  controls_fn = sprintf("%s_asr_c.txt",prefix_fn);
+
+  ssb_awgn = load(ssb_awgn_fn);
+  rade_awgn = load(rade_awgn_fn);
+  freedv_700D_awgn = load(freedv_700D_awgn_fn);
+  ssb_mpp = load(ssb_mpp_fn);
+  rade_mpp = load(rade_mpp_fn);
+  freedv_700D_mpp = load(freedv_700D_mpp_fn);
+  c = load(controls_fn);
+  
+  if length(epslatex)
+    [textfontsize linewidth] = set_fonts(20);
+  end
+
+  # WER v C/No plot
+  figure(1); clf;
+  plot(ssb_awgn(:,2),ssb_awgn(:,3),'b+-;SSB AWGN;');
+  hold on;
+  plot(rade_awgn(:,2),rade_awgn(:,3),'g+-;RADE AWGN;');
+  plot(freedv_700D_awgn(:,2),freedv_700D_awgn(:,3),'r+-;700D AWGN;');
+  plot(ssb_mpp(:,2),ssb_mpp(:,3),'bo--;SSB MPP;');
+  plot(rade_mpp(:,2),rade_mpp(:,3),'go--;RADE MPP;');
+  plot(freedv_700D_mpp(:,2),freedv_700D_mpp(:,3),'ro--;700D MPP;');
+  xmin=30; xmax=60;
+  plot(xmax-5,c(1),'cx;clean;')
+  plot(xmax-5,c(2),'mo;FARGAN;')
+  plot(xmax-5,c(3),'k+;4kHz;')
+  hold off;
+  axis([xmin,xmax,0,40]); grid; ylabel('WER \%'); xlabel("C/No (dB)");
+
+  # WER v SNR plot
+  figure(2); clf;
+  plot(ssb_awgn(:,1),ssb_awgn(:,3),'b+-;SSB AWGN;');
+  hold on;
+  plot(rade_awgn(:,1),rade_awgn(:,3),'r+-;RADE AWGN;');
+  plot(freedv_700D_awgn(:,1),freedv_700D_awgn(:,3),'g+-;700D AWGN;');
+  plot(ssb_mpp(:,1),ssb_mpp(:,3),'bo--;SSB MPP;');
+  plot(rade_mpp(:,1),rade_mpp(:,3),'ro--;RADE MPP;');
+  plot(freedv_700D_mpp(:,1),freedv_700D_mpp(:,3),'go--;700D MPP;');
+  xmin=-5; xmax=20;
+  plot([xmin xmax],[c(2) c(2)],'m-;FARGAN;')
+  plot([xmin xmax],[c(1) c(1)],'c-;clean;')
+  hold off;
+  axis([xmin,xmax,0,40]); grid; ylabel('WER (\%)'); xlabel("SNR3k (dB)");
+  legend('boxoff'); legend("left");
+
+  if length(png_fn)
+    print("-dpng",png_fn,"-S800,600");
+  end
+  if length(epslatex)
+      print_eps_restore(epslatex,"-S250,250",textfontsize,linewidth);
+  end  
+endfunction
+
+function plot_wer_bbfm(prefix_fn, png_fn="", epslatex="")
+  fm_awgn_fn = sprintf("%s_asr_awgn_fm.txt",prefix_fn);
+  rade_awgn_fn = sprintf("%s_asr_awgn_bbfm.txt",prefix_fn);
+  fm_lmr60_fn = sprintf("%s_asr_lmr60_fm.txt",prefix_fn);
+  rade_lmr60_fn = sprintf("%s_asr_lmr60_bbfm.txt",prefix_fn);
+  controls_fn = sprintf("%s_asr_c.txt",prefix_fn);
+
+  fm_awgn = load(fm_awgn_fn);
+  rade_awgn = load(rade_awgn_fn);
+  fm_lmr60 = load(fm_lmr60_fn);
+  rade_lmr60 = load(rade_lmr60_fn);
+  c = load(controls_fn);
+
+  if length(epslatex)
+    [textfontsize linewidth] = set_fonts(30);
+  end
+
+  # WER v RdBm plot
+  figure(1); clf;
+  plot(fm_awgn(:,1),fm_awgn(:,2),'b+-;FM AWGN;');
+  hold on;
+  plot(rade_awgn(:,1),rade_awgn(:,2),'g+-;RADE AWGN;');
+  plot(fm_lmr60(:,1),fm_lmr60(:,2),'bo--;FM LMR60;');
+  plot(rade_lmr60(:,1),rade_lmr60(:,2),'go--;RADE LMR60;');
+  xmax=-100; xmin=-130; 
+  plot([xmin xmax],[c(3) c(3)],'r-;Codec 2 3200;')
+  plot([xmin xmax],[c(2) c(2)],'m-;FARGAN;')
+  plot([xmin xmax],[c(1) c(1)],'c-;clean;')
+  hold off;
+  axis([xmin,xmax,0,40]); grid; ylabel('WER \%'); xlabel("R (dBm)");
+  legend('boxoff');
+
+  if length(png_fn)
+    print("-dpng",png_fn,"-S800,600");
+  end
+  if length(epslatex)
+    print_eps_restore(epslatex,"-S250,250",textfontsize,linewidth);
+  end  
+endfunction
