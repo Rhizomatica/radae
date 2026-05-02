@@ -883,6 +883,10 @@ add_test(NAME v2_rx2_awgn_high
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
                        ./test/v2_spot.sh")
          set_tests_properties(v2_rx2_awgn_high PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+add_test(NAME v2_rx2_c_awgn_high
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR};
+                       RADE_BUILD_DIR=${CMAKE_BINARY_DIR} delta=0.02 ./test/v2_spot_c_rx.sh")
+         set_tests_properties(v2_rx2_c_awgn_high PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 add_test(NAME v2_rx2_awgn_low
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
                        delta=0.03 ./test/v2_spot.sh --EbNodB 1 --hangover 100")
@@ -891,6 +895,10 @@ add_test(NAME v2_rx2_mpp_high
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
                        ./test/v2_spot.sh --g_file g_mpp.f32")
          set_tests_properties(v2_rx2_mpp_high PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+add_test(NAME v2_rx2_c_mpp_high
+         COMMAND sh -c "cd ${CMAKE_SOURCE_DIR};
+                       RADE_BUILD_DIR=${CMAKE_BINARY_DIR} delta=0.03 ./test/v2_spot_c_rx.sh --g_file g_mpp.f32")
+         set_tests_properties(v2_rx2_c_mpp_high PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 add_test(NAME v2_rx2_mpp_low
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
                        delta=0.03 ./test/v2_spot.sh --g_file g_mpp.f32 --EbNodB 6 --hangover 100")
@@ -1132,4 +1140,3 @@ add_test(NAME v2_tx2_ch
                        python3 loss.py features_in.f32 features_out_rx2_inf.f32 --features_hat2 features_out_rx2.f32 \
                        --compare --clip_start 50 --clip_end 50 --delta 0.1")
          set_tests_properties(v2_tx2_ch PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
-
