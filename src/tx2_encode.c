@@ -25,9 +25,10 @@ static void tx2_encode_zero(struct tx2_encode *tx) {
 }
 
 int tx2_encode_init(struct tx2_encode *tx, int auxdata, int txbpf_en) {
-    if (!tx || auxdata == 0) {
-        /* The compiled encoder was trained with aux bits.  auxdata=0
-         * would leave feature slot 20 uninitialised; refuse explicitly. */
+    if (!tx || auxdata != 1) {
+        /* The compiled encoder was trained with exactly one aux feature.
+         * Reject any other value so callers cannot silently request an
+         * unsupported packing layout. */
         return -1;
     }
 

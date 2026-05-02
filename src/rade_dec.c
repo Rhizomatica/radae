@@ -43,6 +43,8 @@ static void rade_compute_conv1d(const LinearLayer *layer, float *output,
 
     assert(input != output);
     assert(layer->nb_inputs <= RADE_MAX_CONV_INPUTS);
+    assert(input_size >= 0);
+    assert(input_size <= layer->nb_inputs);
     if (layer->nb_inputs != input_size) {
         OPUS_COPY(tmp, mem, layer->nb_inputs - input_size);
     }

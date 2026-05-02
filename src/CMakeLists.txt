@@ -33,7 +33,7 @@ target_link_libraries(lpcnet_demo opus m)
 
 add_library(rade_pure_c STATIC ${RADE_PURE_C_API_SOURCES})
 target_link_libraries(rade_pure_c PUBLIC opus m)
-target_compile_definitions(rade_pure_c PRIVATE -DIS_BUILDING_RADE_API=1)
+target_compile_definitions(rade_pure_c PRIVATE IS_BUILDING_RADE_API=1)
 
 if(RADAE_BUILD_LEGACY_PYTHON_API)
 add_library(rade
@@ -42,11 +42,11 @@ add_library(rade
 if(APPLE OR WIN32)
 target_link_libraries(rade Python3::Python opus)
 else(APPLE OR WIN32)
-target_link_libraries(rade Python3::Python)
+target_link_libraries(rade Python3::Python opus m)
 endif(APPLE OR WIN32)
 target_include_directories(rade PRIVATE
     "$<TARGET_PROPERTY:Python3::NumPy,INTERFACE_INCLUDE_DIRECTORIES>")
-target_compile_definitions(rade PRIVATE -DIS_BUILDING_RADE_API=1)
+target_compile_definitions(rade PRIVATE IS_BUILDING_RADE_API=1)
 set_target_properties(rade PROPERTIES
     SOVERSION "0.1"
     PUBLIC_HEADER "rade_api.h"
