@@ -86,11 +86,11 @@ f"""
 
 
     encoder_gru_layers = [
-        ('core_encoder.module.gru1'       , 'enc_gru1',   'TANH', True),
-        ('core_encoder.module.gru2'       , 'enc_gru2',   'TANH', True),
-        ('core_encoder.module.gru3'       , 'enc_gru3',   'TANH', True),
-        ('core_encoder.module.gru4'       , 'enc_gru4',   'TANH', True),
-        ('core_encoder.module.gru5'       , 'enc_gru5',   'TANH', True),
+        ('core_encoder.module.gru1'       , 'enc_gru1',   'TANH', False),
+        ('core_encoder.module.gru2'       , 'enc_gru2',   'TANH', False),
+        ('core_encoder.module.gru3'       , 'enc_gru3',   'TANH', False),
+        ('core_encoder.module.gru4'       , 'enc_gru4',   'TANH', False),
+        ('core_encoder.module.gru5'       , 'enc_gru5',   'TANH', False),
     ]
 
     enc_max_rnn_units = max([dump_torch_weights(enc_writer, model.get_submodule(name), export_name, verbose=True, input_sparse=True, quantize=quantize, scale=None, recurrent_scale=None)
@@ -98,11 +98,11 @@ f"""
 
 
     encoder_conv_layers = [
-        ('core_encoder.module.conv1.conv'       , 'enc_conv1',   'TANH', True),
-        ('core_encoder.module.conv2.conv'       , 'enc_conv2',   'TANH', True),
-        ('core_encoder.module.conv3.conv'       , 'enc_conv3',   'TANH', True),
-        ('core_encoder.module.conv4.conv'       , 'enc_conv4',   'TANH', True),
-        ('core_encoder.module.conv5.conv'       , 'enc_conv5',   'TANH', True),
+        ('core_encoder.module.conv1.conv'       , 'enc_conv1',   'TANH', False),
+        ('core_encoder.module.conv2.conv'       , 'enc_conv2',   'TANH', False),
+        ('core_encoder.module.conv3.conv'       , 'enc_conv3',   'TANH', False),
+        ('core_encoder.module.conv4.conv'       , 'enc_conv4',   'TANH', False),
+        ('core_encoder.module.conv5.conv'       , 'enc_conv5',   'TANH', False),
     ]
 
     enc_max_conv_inputs = max([dump_torch_weights(enc_writer, model.get_submodule(name), export_name, verbose=True, quantize=quantize, scale=None) for name, export_name, _, quantize in encoder_conv_layers])
@@ -113,11 +113,11 @@ f"""
     # decoder
     decoder_dense_layers = [
         ('core_decoder.module.dense_1'      , 'dec_dense1',  'TANH', False),
-        ('core_decoder.module.glu1.gate'    , 'dec_glu1',    'TANH', True),
-        ('core_decoder.module.glu2.gate'    , 'dec_glu2',    'TANH', True),
-        ('core_decoder.module.glu3.gate'    , 'dec_glu3',    'TANH', True),
-        ('core_decoder.module.glu4.gate'    , 'dec_glu4',    'TANH', True),
-        ('core_decoder.module.glu5.gate'    , 'dec_glu5',    'TANH', True),
+        ('core_decoder.module.glu1.gate'    , 'dec_glu1',    'TANH', False),
+        ('core_decoder.module.glu2.gate'    , 'dec_glu2',    'TANH', False),
+        ('core_decoder.module.glu3.gate'    , 'dec_glu3',    'TANH', False),
+        ('core_decoder.module.glu4.gate'    , 'dec_glu4',    'TANH', False),
+        ('core_decoder.module.glu5.gate'    , 'dec_glu5',    'TANH', False),
         ('core_decoder.module.output'       , 'dec_output',  'LINEAR', False)
     ]
 
@@ -127,22 +127,22 @@ f"""
 
 
     decoder_gru_layers = [
-        ('core_decoder.module.gru1'         , 'dec_gru1',    'TANH', True),
-        ('core_decoder.module.gru2'         , 'dec_gru2',    'TANH', True),
-        ('core_decoder.module.gru3'         , 'dec_gru3',    'TANH', True),
-        ('core_decoder.module.gru4'         , 'dec_gru4',    'TANH', True),
-        ('core_decoder.module.gru5'         , 'dec_gru5',    'TANH', True),
+        ('core_decoder.module.gru1'         , 'dec_gru1',    'TANH', False),
+        ('core_decoder.module.gru2'         , 'dec_gru2',    'TANH', False),
+        ('core_decoder.module.gru3'         , 'dec_gru3',    'TANH', False),
+        ('core_decoder.module.gru4'         , 'dec_gru4',    'TANH', False),
+        ('core_decoder.module.gru5'         , 'dec_gru5',    'TANH', False),
     ]
 
     dec_max_rnn_units = max([dump_torch_weights(dec_writer, model.get_submodule(name), export_name, verbose=True, input_sparse=True, quantize=quantize, scale=None, recurrent_scale=None)
                              for name, export_name, _, quantize in decoder_gru_layers])
 
     decoder_conv_layers = [
-        ('core_decoder.module.conv1.conv'       , 'dec_conv1',   'TANH', True),
-        ('core_decoder.module.conv2.conv'       , 'dec_conv2',   'TANH', True),
-        ('core_decoder.module.conv3.conv'       , 'dec_conv3',   'TANH', True),
-        ('core_decoder.module.conv4.conv'       , 'dec_conv4',   'TANH', True),
-        ('core_decoder.module.conv5.conv'       , 'dec_conv5',   'TANH', True),
+        ('core_decoder.module.conv1.conv'       , 'dec_conv1',   'TANH', False),
+        ('core_decoder.module.conv2.conv'       , 'dec_conv2',   'TANH', False),
+        ('core_decoder.module.conv3.conv'       , 'dec_conv3',   'TANH', False),
+        ('core_decoder.module.conv4.conv'       , 'dec_conv4',   'TANH', False),
+        ('core_decoder.module.conv5.conv'       , 'dec_conv5',   'TANH', False),
     ]
 
     dec_max_conv_inputs = max([dump_torch_weights(dec_writer, model.get_submodule(name), export_name, verbose=True, quantize=quantize, scale=None) for name, export_name, _, quantize in decoder_conv_layers])
@@ -222,7 +222,7 @@ if __name__ == "__main__":
     # Note only a few parms required to extract weights for core encoder/decoder.  The weights are not affected
     # by the "bottleneck" and rate Rs or rate Fs operation. For example this script can be used for model05 and model19_check3
     model = RADAE(num_features, args.latent_dim, EbNodB=100)
-    model.load_state_dict(checkpoint['state_dict'], strict=False, weights_only=True)
+    model.load_state_dict(checkpoint['state_dict'], strict=False)
 
     def _remove_weight_norm(m):
         try:

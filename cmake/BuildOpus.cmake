@@ -1,6 +1,16 @@
-message(STATUS "Will build opus with FARGAN")
+message(STATUS "Will build opus with FARGAN (HIGH_ACCURACY=on)")
 
-set(CONFIGURE_COMMAND ./autogen.sh && ./configure --enable-osce --enable-dred --disable-shared --disable-doc --disable-extra-programs)
+# HIGH_ACCURACY swaps opus's polynomial tanh/sigmoid for the libm
+# tanh()/exp() in dnn/nnet_arch.h.  Required for parity against PyTorch:
+# with the polynomial path the V2 encoder accumulates ~0.1 of latent
+# drift across the 11-layer DenseNet stack, which the bottleneck=3 unit
+# clipper amplifies into ~0.13 IQ-sample errors at the TX output.
+# CPPFLAGS is preferred over CFLAGS so opus's own optimisation flags
+# stay intact.
+set(OPUS_EXTRA_CPPFLAGS "-DHIGH_ACCURACY")
+set(OPUS_EXTRA_CFLAGS "-fPIC")
+
+set(CONFIGURE_COMMAND ./autogen.sh && ./configure --enable-osce --enable-dred --disable-shared --disable-doc --disable-extra-programs CPPFLAGS=${OPUS_EXTRA_CPPFLAGS} CFLAGS=${OPUS_EXTRA_CFLAGS})
 
 if (CMAKE_CROSSCOMPILING)
 set(CONFIGURE_COMMAND ${CONFIGURE_COMMAND} --host=${CMAKE_C_COMPILER_TARGET} --target=${CMAKE_C_COMPILER_TARGET})
@@ -18,7 +28,7 @@ ExternalProject_Add(build_opus_x86
     DOWNLOAD_EXTRACT_TIMESTAMP NO
     BUILD_IN_SOURCE 1
     PATCH_COMMAND sh -c "patch dnn/nnet.h < ${CMAKE_SOURCE_DIR}/src/opus-nnet.h.diff"
-    CONFIGURE_COMMAND ${CONFIGURE_COMMAND} --host=x86_64-apple-darwin --target=x86_64-apple-darwin CFLAGS=-arch\ x86_64\ -O2\ -mmacosx-version-min=10.11
+    CONFIGURE_COMMAND ${CONFIGURE_COMMAND} --host=x86_64-apple-darwin --target=x86_64-apple-darwin CFLAGS=-arch\ x86_64\ -O2\ -mmacosx-version-min=10.11\ -fPIC
     BUILD_COMMAND $(MAKE)
     INSTALL_COMMAND ""
     URL ${OPUS_URL}
@@ -27,7 +37,7 @@ ExternalProject_Add(build_opus_arm
     DOWNLOAD_EXTRACT_TIMESTAMP NO
     BUILD_IN_SOURCE 1
     PATCH_COMMAND sh -c "patch dnn/nnet.h < ${CMAKE_SOURCE_DIR}/src/opus-nnet.h.diff"
-    CONFIGURE_COMMAND ${CONFIGURE_COMMAND} --host=aarch64-apple-darwin --target=aarch64-apple-darwin CFLAGS=-arch\ arm64\ -O2\ -mmacosx-version-min=10.11
+    CONFIGURE_COMMAND ${CONFIGURE_COMMAND} --host=aarch64-apple-darwin --target=aarch64-apple-darwin CFLAGS=-arch\ arm64\ -O2\ -mmacosx-version-min=10.11\ -fPIC
     BUILD_COMMAND $(MAKE)
     INSTALL_COMMAND ""
     URL ${OPUS_URL}

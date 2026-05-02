@@ -193,7 +193,11 @@ This section is optional - pre-trained models that run on a standard laptop CPU 
 
 # C Port of Core Encoder and Decoder
 
-The following describes the V1 C port.  A V2 C port is planned as future work.
+The following describes the V1 core encoder/decoder C port.
+
+A RADE V2 pure-C **RX** port now exists in this repository (see
+`C_RX_MIGRATION.md`, `src/radae_rx_v2.c`, and `rade_rx_v2_pure_c_*` in
+`src/rade_api.c`).  Future work refers to the remaining V2 **TX** C port.
 
 The model weights can be compiled in or loaded at init-time from a binary blob.  The actual model is hard coded in `rade_enc.c` and `rade_dec.c`, and can't be easily changed.
 
@@ -219,4 +223,3 @@ cd radae/build
 ./src/write_rade_weights ../bin/model05.bin
 ```
 These can then be loaded at init-time, see examples in `src/test_rand_enc.c` and `src/test_rand_dec.c`.
-

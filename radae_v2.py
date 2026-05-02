@@ -35,6 +35,64 @@ import numpy as np
 import torch
 
 
+class ComfortNoiseGenerator:
+   """Synth low-level noise frames so the speaker doesn't go dead silent
+   between decoded frames in lossy / hangover conditions.  Imported by
+   radae_rxe2.py and rx2.py main()."""
+
+   HOLD_OUTPUTS = 50
+
+   def __init__(self, dec_stride, num_features, auxdata, enabled=True):
+      self.enabled = enabled
+      self.dec_stride = dec_stride
+      self.num_features = num_features
+      self.auxdata = auxdata
+      self.emit_parity = 0
+      self.remaining_outputs = 0
+      self.rng = np.random.default_rng()
+      self.profile = np.zeros((dec_stride, num_features), dtype=np.float32)
+      self.profile[:, 0] = -5.0
+      self.profile[:, 18] = -1.4
+      self.profile[:, 19] = -1.0
+
+   def update(self, features_hat_slice, symbol_count):
+      frames = features_hat_slice.detach().cpu().numpy()[0].astype(np.float32)
+      target = np.array(frames, copy=True)
+      target[:, 0] = np.clip(np.minimum(target[:, 0] - 2.0, -4.0), -6.0, -4.0)
+      target[:, 18] = -1.4
+      target[:, 19] = -1.0
+      if self.auxdata and target.shape[1] > 20:
+         target[:, 20] = 0.0
+      self.profile = (0.96 * self.profile + 0.04 * target).astype(np.float32)
+      self.emit_parity = symbol_count & 1
+      self.remaining_outputs = self.HOLD_OUTPUTS
+
+   def should_emit(self, symbol_count):
+      if not self.enabled:
+         return False
+      if self.remaining_outputs <= 0:
+         return False
+      return (symbol_count & 1) == self.emit_parity
+
+   def generate(self):
+      frames = np.array(self.profile, copy=True)
+      frames[:, 0] = np.clip(
+         frames[:, 0] + 0.08 * self.rng.standard_normal(self.dec_stride),
+         -6.0, -3.8
+      )
+      frames[:, 1:6] += 0.02 * self.rng.standard_normal((self.dec_stride, 5))
+      frames[:, 18] = -1.4
+      frames[:, 19] = np.clip(
+         -0.92 + 0.03 * self.rng.standard_normal(self.dec_stride),
+         -1.0, -0.75
+      )
+      if self.auxdata and frames.shape[1] > 20:
+         frames[:, 20] = 0.0
+      if self.remaining_outputs > 0:
+         self.remaining_outputs -= 1
+      return frames.astype(np.float32)
+
+
 class RADEv2Receiver:
    """RADE V2 acquisition and frame sync state machine.
 
@@ -266,7 +324,7 @@ class RADEv2Receiver:
 
    def _detect_eoo(self):
       """Detect EOO using channel time-domain sparsity."""
-      pend_fd = np.fft.fft(self.model.pend.numpy())
+      pend_fd = np.fft.fft(self.model.pend.detach().cpu().numpy())
       rx_fd   = np.fft.fft(self.rx_sym_td)
       active  = np.abs(pend_fd) > np.max(np.abs(pend_fd)) * 1e-3
       H_est   = np.zeros(self.M, dtype=np.complex64)
@@ -365,7 +423,7 @@ class RADEv2Transmitter:
          # Streaming complex BPF with same parameters as model
          from radae import complex_bpf as ComplexBPF
          Ntap      = 101
-         w         = model.w.cpu().numpy()
+         w         = model.w.detach().cpu().numpy()
          Fs        = float(model.Fs)
          bandwidth = 1.2 * (w[model.Nc - 1] - w[0]) * Fs / (2 * np.pi)
          centre    = (w[model.Nc - 1] + w[0]) * Fs / (2 * np.pi) / 2
@@ -407,4 +465,4 @@ class RADEv2Transmitter:
 
    def eoo(self):
       """Return the V2 end-of-over sequence as complex64 IQ samples."""
-      return self.model.eoo_v2.numpy().flatten().astype(np.csingle)
+      return self.model.eoo_v2.detach().cpu().numpy().flatten().astype(np.csingle)

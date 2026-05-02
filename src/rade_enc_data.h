@@ -1,4 +1,4 @@
-/* Auto generated from checkpoint checkpoint_epoch_100.pth */
+/* Auto generated from checkpoint checkpoint_epoch_200.pth */
 
 
 #ifndef RADE_ENC_DATA_H
@@ -16,7 +16,7 @@
 
 #define ENC_DENSE1_OUT_SIZE 64
 
-#define ENC_ZDENSE_OUT_SIZE 80
+#define ENC_ZDENSE_OUT_SIZE 56
 
 #define ENC_GRU1_OUT_SIZE 64
 
@@ -98,6 +98,6 @@ struct RADEEnc {
     LinearLayer enc_conv5;
 };
 
-int init_radeenc(RADEEnc *model, const WeightArray *arrays, int input_dim);
+int init_radeenc(RADEEnc *model, const WeightArray *arrays);
 
 #endif /* RADE_ENC_DATA_H */

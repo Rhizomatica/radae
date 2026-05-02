@@ -39,7 +39,7 @@ from matplotlib import pyplot as plt
 import torch
 from radae import RADAE,complex_bpf
 from models_sync import FrameSyncNet
-from radae_v2 import RADEv2Receiver
+from radae_v2 import ComfortNoiseGenerator, RADEv2Receiver
 
 
 parser = argparse.ArgumentParser()
@@ -96,6 +96,8 @@ parser.set_defaults(limit_pitch=True)
 parser.add_argument('--nolimit_pitch', action='store_false', dest='limit_pitch', help='disable limiting (clip) lower end of pitch feature to prevent synthesis pops with some speakers/channels (default enabled)')
 parser.set_defaults(mute=False)
 parser.add_argument('--mute', action='store_false',  dest='mute', help='enable mute when sig lost (default disabled)')
+parser.set_defaults(comfort_noise=True)
+parser.add_argument('--no_comfort_noise', action='store_false', dest='comfort_noise', help='disable comfort-noise output when no valid decode is available')
 args = parser.parse_args()
 
 # make sure we don't use a GPU
@@ -183,6 +185,8 @@ sequence_length = len(rx)//(Ncp+M)
 print(sequence_length, file=sys.stderr)
 
 receiver = RADEv2Receiver(model, frame_sync_nn, args)
+comfort_noise = ComfortNoiseGenerator(model.dec_stride, num_features,
+                                      args.auxdata, args.comfort_noise)
 z_hat        = torch.zeros((1, sequence_length, model.latent_dim), dtype=torch.float32)
 features_hat = torch.zeros((1, sequence_length * model.dec_stride, num_features))
 
@@ -231,10 +235,18 @@ while prx + nin < len(rx):
    receiver.state = next_state
 
    if features_hat_slice is not None:
+      comfort_noise.update(features_hat_slice, receiver.s)
       z_hat[0, receiver.i, :] = receiver.az_hat
       dec_st = receiver.model.dec_stride * receiver.i
       dec_en = receiver.model.dec_stride * (receiver.i + 1)
       features_hat[0, dec_st:dec_en, :] = features_hat_slice
+      receiver.i += 1
+   elif comfort_noise.should_emit(receiver.s):
+      dec_st = receiver.model.dec_stride * receiver.i
+      dec_en = receiver.model.dec_stride * (receiver.i + 1)
+      features_hat[0, dec_st:dec_en, :] = torch.from_numpy(
+         comfort_noise.generate()
+      )
       receiver.i += 1
 
    if receiver.s > receiver.args.timing_adj_at:
