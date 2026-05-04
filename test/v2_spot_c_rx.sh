@@ -44,7 +44,7 @@ fi
 
 ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/all.wav /dev/null \
     --rate_Fs --latent-dim 56 --peak --cp 0.004 --time_offset -16 \
-    --correct_time_offset -16 --auxdata --w1_dec 128 --write_rx 250725_rx.f32 \
+    --correct_time_offset -8 --auxdata --w1_dec 128 --write_rx 250725_rx.f32 \
     --prepend_noise 1 --append_noise 2 --freq_offset 25 --correct_freq_offset \
     ${g_file} ${a_g_file} ${EbNodB} ${a_EbNodB_value}
 

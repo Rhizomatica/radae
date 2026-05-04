@@ -44,7 +44,7 @@ done
 set -- "${POSITIONAL[@]}" # restore positional parameters
 
 ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/brian_g8sez.wav /dev/null --rate_Fs --latent-dim 56 \
---peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 --write_rx 250725_rx.f32 \
+--peak --cp 0.004 --time_offset -16 --correct_time_offset -8 --auxdata --w1_dec 128 --write_rx 250725_rx.f32 \
 $g_file $a_g_file
 
 ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync 250725_rx.f32 /dev/null --no_bpf --write_delta_hat delta_hat.int16 $@

@@ -6,7 +6,7 @@
    Example:
 
      ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/all.wav /dev/null \\
-      --rate_Fs --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 \\
+      --rate_Fs --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -8 \\
       --auxdata --w1_dec 128 --write_rx all_rx.f32
 
      python3 autocorr.py rx.f32 Ry.f32 delta.f32

@@ -922,7 +922,7 @@ add_test(NAME v2_rx2_mpp_low_pop1
                        ${CMAKE_SOURCE_DIR}/build/src/lpcnet_demo -features wav/david_vk5dgr.wav features_in.f32; \
                        python3 inject_bad_pitch.py features_in.f32 features_in_bad.f32 -3.0 5; \
                        python3 inference.py 250725/checkpoints/checkpoint_epoch_200.pth features_in_bad.f32 /dev/null \
-                       --rate_Fs --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 \
+                        --rate_Fs --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -8 \
                        --auxdata --w1_dec 128 --EbNodB 100 --write_rx pop_tx.f32; \
                        ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync pop_tx.f32 tmp.wav")
          set_tests_properties(v2_rx2_mpp_low_pop1 PROPERTIES FAIL_REGULAR_EXPRESSION "POP")
@@ -931,7 +931,7 @@ add_test(NAME v2_rx2_mpp_low_pop2
                        ${CMAKE_SOURCE_DIR}/build/src/lpcnet_demo -features wav/david_vk5dgr.wav features_in.f32; \
                        python3 inject_bad_pitch.py features_in.f32 features_in_bad.f32 -3.0 5; \
                        python3 inference.py 250725/checkpoints/checkpoint_epoch_200.pth features_in_bad.f32 /dev/null \
-                       --rate_Fs --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 \
+                        --rate_Fs --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -8 \
                        --auxdata --w1_dec 128 --EbNodB 100 --write_rx pop_tx.f32; \
                        ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync pop_tx.f32 tmp.wav \
                        --nolimit_pitch")
@@ -1015,7 +1015,7 @@ add_test(NAME v2_rx2_agc_mpp_low
 add_test(NAME v2_rx2_ch
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; 
                        ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/brian_g8sez.wav /dev/null --rate_Fs \
-                       --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 \
+                        --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -8 --auxdata --w1_dec 128 \
                        --ssb_bpf --write_rx brian_tx.f32; \
          cat brian_tx.f32 | python3 f32toint16.py --real --scale 16383 | ${CMAKE_BINARY_DIR}/src/ch - - | python3 int16tof32.py --zeropad > brian_rx.f32
          ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725_ml_sync brian_rx.f32 /dev/null \
@@ -1027,7 +1027,7 @@ add_test(NAME v2_rx2_ch
 add_test(NAME v2_eoo_awgn_high
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
                        ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/brian_g8sez.wav /dev/null --rate_Fs \
-                       --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 \
+                        --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -8 --auxdata --w1_dec 128 \
                        --end_of_over_v2 --write_rx v2_eoo_tx.f32 --append_noise 1; \
                        ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync v2_eoo_tx.f32 /dev/null \
                        2>&1 | grep 'EOO detected' && echo PASS || echo FAIL")
@@ -1036,7 +1036,7 @@ add_test(NAME v2_eoo_awgn_high
 add_test(NAME v2_eoo_awgn_low
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
                        ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/brian_g8sez.wav /dev/null --rate_Fs \
-                       --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 \
+                        --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -8 --auxdata --w1_dec 128 \
                        --end_of_over_v2 --write_rx v2_eoo_tx.f32 --append_noise 1 --EbNodB 6; \
                        ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync v2_eoo_tx.f32 /dev/null \
                        2>&1 | grep 'EOO detected' && echo PASS || echo FAIL")
@@ -1045,7 +1045,7 @@ add_test(NAME v2_eoo_awgn_low
 add_test(NAME v2_eoo_mpp_high
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
                        ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/brian_g8sez.wav /dev/null --rate_Fs \
-                       --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 \
+                        --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -8 --auxdata --w1_dec 128 \
                        --end_of_over_v2 --write_rx v2_eoo_tx.f32 --append_noise 1 --g_file g_mpp.f32; \
                        ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync v2_eoo_tx.f32 /dev/null \
                        2>&1 | grep 'EOO detected' && echo PASS || echo FAIL")
@@ -1054,7 +1054,7 @@ add_test(NAME v2_eoo_mpp_high
 add_test(NAME v2_eoo_mpp_low
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
                        ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/brian_g8sez.wav /dev/null --rate_Fs \
-                       --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 \
+                        --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -8 --auxdata --w1_dec 128 \
                        --end_of_over_v2 --write_rx v2_eoo_tx.f32 --append_noise 1 --g_file g_mpp.f32 --EbNodB 8; \
                        ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync v2_eoo_tx.f32 /dev/null \
                        2>&1 | grep 'EOO detected' && echo PASS || echo FAIL")
@@ -1064,7 +1064,7 @@ add_test(NAME v2_eoo_mpp_low
 add_test(NAME v2_eoo_no_false_trigger_awgn
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
                        ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/all.wav /dev/null --rate_Fs \
-                       --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 \
+                        --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -8 --auxdata --w1_dec 128 \
                        --write_rx v2_eoo_notx.f32 --EbNodB 10; \
                        ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync v2_eoo_notx.f32 /dev/null \
                        2>&1 | \
@@ -1074,7 +1074,7 @@ add_test(NAME v2_eoo_no_false_trigger_awgn
 add_test(NAME v2_eoo_no_false_trigger_mpp
          COMMAND sh -c "cd ${CMAKE_SOURCE_DIR}; \
                        ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/all.wav /dev/null --rate_Fs \
-                       --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 \
+                        --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -8 --auxdata --w1_dec 128 \
                        --write_rx v2_eoo_notx.f32 --g_file g_mpp.f32 --EbNodB 10; \
                        ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync v2_eoo_notx.f32 /dev/null \
                        2>&1 | \
@@ -1087,7 +1087,7 @@ add_test(NAME v2_snr_est_high
                        ${CMAKE_SOURCE_DIR}/build/src/lpcnet_demo -features wav/david_vk5dgr.wav snr_feats.f32; \
                        python3 inference.py 250725/checkpoints/checkpoint_epoch_200.pth snr_feats.f32 /dev/null \
                        --latent-dim 56 --w1_dec 128 --auxdata --rate_Fs --cp 0.004 \
-                       --time_offset -16 --correct_time_offset -16 --peak \
+                        --time_offset -16 --correct_time_offset -8 --peak \
                        --EbNodB 12 --write_rx snr_rx_high.f32 --append_noise 1 > snr_inf_high.txt; \
                        SNR3K=\$(grep Measured snr_inf_high.txt | awk '{print \$4}'); \
                        python3 rx2.py 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync \
@@ -1101,7 +1101,7 @@ add_test(NAME v2_snr_est_low
                        ${CMAKE_SOURCE_DIR}/build/src/lpcnet_demo -features wav/david_vk5dgr.wav snr_feats.f32; \
                        python3 inference.py 250725/checkpoints/checkpoint_epoch_200.pth snr_feats.f32 /dev/null \
                        --latent-dim 56 --w1_dec 128 --auxdata --rate_Fs --cp 0.004 \
-                       --time_offset -16 --correct_time_offset -16 --peak \
+                        --time_offset -16 --correct_time_offset -8 --peak \
                        --EbNodB 2 --write_rx snr_rx_low.f32 --append_noise 1 > snr_inf_low.txt; \
                        SNR3K=\$(grep Measured snr_inf_low.txt | awk '{print \$4}'); \
                        python3 rx2.py 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync \

@@ -61,7 +61,7 @@ def main():
         bottleneck=3,
         cyclic_prefix=args.cp,
         time_offset=-16,
-        correct_time_offset=-16,
+        correct_time_offset=-8,
         stateful_decoder=False,
         w1_dec=128,
         w1_dec_stateful=128,

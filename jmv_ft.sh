@@ -9,7 +9,7 @@ model_id=250725
 model=${model_id}/checkpoints/checkpoint_epoch_200.pth
 speech=~/Downloads/all_speech.wav
 speech_test=wav/all.wav
-inference_args="--rate_Fs --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128"
+inference_args="--rate_Fs --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -8 --auxdata --w1_dec 128"
 train_args=""
 
 function print_help {

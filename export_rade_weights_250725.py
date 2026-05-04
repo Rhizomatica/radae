@@ -221,7 +221,7 @@ if __name__ == "__main__":
     checkpoint = torch.load(args.checkpoint, map_location='cpu')
     # Note only a few parms required to extract weights for core encoder/decoder.  The weights are not affected
     # by the "bottleneck" and rate Rs or rate Fs operation. For example this script can be used for model05 and model19_check3
-    model = RADAE(num_features, args.latent_dim, EbNodB=100, Nzmf=1, rate_Fs=True, bottleneck=3, cyclic_prefix=0.004, time_offset=-16, correct_time_offset=-16, stateful_decoder=False, w1_dec=128, w1_dec_stateful=96, peak=True)
+    model = RADAE(num_features, args.latent_dim, EbNodB=100, Nzmf=1, rate_Fs=True, bottleneck=3, cyclic_prefix=0.004, time_offset=-16, correct_time_offset=-8, stateful_decoder=False, w1_dec=128, w1_dec_stateful=96, peak=True)
     model.load_state_dict(checkpoint["state_dict"], strict=False)
 
     def _remove_weight_norm(m):

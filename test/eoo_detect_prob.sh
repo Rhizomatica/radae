@@ -69,7 +69,7 @@ for i in $(seq 1 $N); do
     fi
 
     ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth $wav_tmp /dev/null --rate_Fs \
-        --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 --auxdata --w1_dec 128 \
+        --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -8 --auxdata --w1_dec 128 \
         --end_of_over_v2 --write_rx $rx_tmp --append_noise 1 --EbNodB $EbNodB \
         $chan_args $g_offset_args 2>/dev/null
 

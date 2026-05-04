@@ -14,7 +14,7 @@ extern "C" {
 #define RX2_MODEL_NS 2
 #define RX2_MODEL_NC 14
 #define RX2_MODEL_TIME_OFFSET -16
-#define RX2_MODEL_CORRECT_TIME_OFFSET -16
+#define RX2_MODEL_CORRECT_TIME_OFFSET -8
 #define RX2_MODEL_FS 8000.0f
 
 extern const float rx2_model_w[RX2_MODEL_NC];

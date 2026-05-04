@@ -55,7 +55,7 @@ From `radae_txe2.py` defaults and the Hermes command line
 (`sbitx_radae.c:454`):
 
 - `latent_dim=56`, `bottleneck=3`, `cp=0.004`, `time_offset=-16`,
-  `correct_time_offset=-16`, `w1_dec=128`, `peak=True`, `auxdata=True`,
+  `correct_time_offset=-8`, `w1_dec=128`, `peak=True`, `auxdata=True`,
   `Nzmf=1`, `txbpf=False`, `send_eoo=True`
 
 These match the 250725 model compiled into `librade.so`.  Non-production
