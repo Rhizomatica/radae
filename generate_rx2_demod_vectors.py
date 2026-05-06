@@ -42,7 +42,7 @@ def main():
     parser.add_argument("--num-features", type=int, default=21)
     parser.add_argument("--cp", type=float, default=0.004)
     parser.add_argument("--time-offset", type=int, default=-16)
-    parser.add_argument("--correct-time-offset", type=int, default=-16)
+    parser.add_argument("--correct-time-offset", type=int, default=-8)
     parser.add_argument("--ncases", type=int, default=160)
     parser.add_argument("--seed", type=int, default=11)
     args = parser.parse_args()

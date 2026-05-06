@@ -70,7 +70,7 @@ def main():
     parser.add_argument("--timing-adj-at", type=int, default=10)
     parser.add_argument("--reset-output-on-resync", type=int, default=0)
     parser.add_argument("--time-offset", type=int, default=-16)
-    parser.add_argument("--correct-time-offset", type=int, default=-16)
+    parser.add_argument("--correct-time-offset", type=int, default=-8)
     parser.add_argument("--fix-delta-hat", type=int, default=0,
                         help="pin delta_hat_g (0 = argmax, matching rx2.py)")
     parser.add_argument("--seed", type=int, default=7)
